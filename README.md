@@ -1,4 +1,4 @@
-# HERMORD USV Ground Station
+# USV Ground Station
 
 A ROS 2 Humble ground station package for managing, coordinating, and monitoring Unmanned Surface Vehicle (USV) swarm formations.
 
