@@ -67,9 +67,6 @@ class GroundStationNode(Node):
 
 
 def main(args=None):
-    # Allow clean Ctrl+C termination from terminal
-    signal.signal(signal.SIGINT, signal.SIG_DFL)
-
     # Initialize ROS 2
     rclpy.init(args=args)
     ros_node = GroundStationNode()
@@ -85,9 +82,12 @@ def main(args=None):
     window.formation_command_signal.connect(ros_node.publish_formation_command)
     window.emergency_stop_signal.connect(ros_node.publish_emergency_stop)
 
-    # Integrate ROS 2 event loop with Qt event loop via QTimer
+    # Safe ROS 2 event loop via QTimer
+    is_shutting_down = False
+
     def _safe_ros_spin():
-        if rclpy.ok():
+        nonlocal is_shutting_down
+        if not is_shutting_down and rclpy.ok():
             try:
                 rclpy.spin_once(ros_node, timeout_sec=0)
             except Exception:
@@ -96,6 +96,14 @@ def main(args=None):
     ros_spin_timer = QTimer()
     ros_spin_timer.timeout.connect(_safe_ros_spin)
     ros_spin_timer.start(20)  # Spin at 50 Hz
+
+    def sigint_handler(sig, frame):
+        nonlocal is_shutting_down
+        is_shutting_down = True
+        ros_spin_timer.stop()
+        app.quit()
+
+    signal.signal(signal.SIGINT, sigint_handler)
 
     # Center window on screen
     screen_geom = app.primaryScreen().availableGeometry()
@@ -123,8 +131,17 @@ def main(args=None):
     exit_code = app.exec_()
 
     # Clean shutdown
-    ros_node.destroy_node()
-    rclpy.shutdown()
+    is_shutting_down = True
+    ros_spin_timer.stop()
+    if rclpy.ok():
+        try:
+            ros_node.destroy_node()
+        except Exception:
+            pass
+        try:
+            rclpy.shutdown()
+        except Exception:
+            pass
     sys.exit(exit_code)
 
 
