@@ -1,7 +1,10 @@
 """
 HERMORD Ground Station Main Window.
-Provides USV Swarm status monitoring, tactical radar visualization,
-formation control, and ROS 2 communication.
+Redesigned with Shadcn UI aesthetics:
+- Neutral zinc color hierarchy
+- Clean 1px borders and refined card elevations
+- Minimalist typography and status pills
+- Modern primary, secondary, and destructive button variants
 """
 
 import sys
@@ -9,174 +12,210 @@ import math
 import time
 import json
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
-from PyQt5.QtGui import QFont, QColor, QIcon
+from PyQt5.QtGui import QFont, QColor
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QLabel, QPushButton, QComboBox, QSlider, QTableWidget,
     QTableWidgetItem, QHeaderView, QTextEdit, QGroupBox,
-    QCheckBox, QFrame, QSplitter, QProgressBar
+    QCheckBox, QFrame, QSplitter
 )
 
 from ground_station.gui.radar_widget import RadarWidget
 
 
-DARK_STYLESHEET = """
+SHADCN_STYLESHEET = """
 QMainWindow {
-    background-color: #0b1118;
-    color: #e2e8f0;
+    background-color: #09090b;
+    color: #fafafa;
 }
 QWidget {
-    font-family: "Helvetica Neue", "Arial";
-    color: #e2e8f0;
+    font-family: -apple-system, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+    color: #fafafa;
 }
+
+/* Card / Group Containers */
 QGroupBox {
-    border: 1px solid #1e293b;
+    border: 1px solid #27272a;
     border-radius: 8px;
-    margin-top: 14px;
-    padding-top: 10px;
-    background-color: #111a26;
-    font-size: 11px;
+    margin-top: 18px;
+    padding-top: 14px;
+    background-color: #121215;
+    font-size: 12px;
     font-weight: 600;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-    color: #38bdf8;
+    color: #a1a1aa;
+    letter-spacing: 0.2px;
 }
 QGroupBox::title {
     subcontrol-origin: margin;
     subcontrol-position: top left;
-    padding: 0 8px;
+    padding: 0 6px;
     left: 12px;
+    color: #fafafa;
 }
+
+/* Table Widget */
 QTableWidget {
-    background-color: #0d1520;
-    border: 1px solid #1e293b;
+    background-color: #0c0c0e;
+    border: 1px solid #27272a;
     border-radius: 6px;
-    gridline-color: #1e293b;
-    color: #e2e8f0;
-    selection-background-color: #0284c7;
-    selection-color: #ffffff;
+    gridline-color: #18181b;
+    color: #f4f4f5;
+    selection-background-color: #27272a;
+    selection-color: #fafafa;
+    font-size: 12px;
 }
 QHeaderView::section {
-    background-color: #162232;
-    color: #94a3b8;
-    padding: 6px;
-    border: 1px solid #1e293b;
-    font-weight: bold;
+    background-color: #121215;
+    color: #a1a1aa;
+    padding: 6px 8px;
+    border: none;
+    border-bottom: 1px solid #27272a;
+    font-weight: 500;
     font-size: 11px;
 }
+
+/* Buttons */
 QPushButton {
-    background-color: #1e293b;
-    color: #f8fafc;
-    border: 1px solid #334155;
+    background-color: #18181b;
+    color: #f4f4f5;
+    border: 1px solid #27272a;
     border-radius: 6px;
-    padding: 8px 14px;
-    font-weight: 600;
+    padding: 7px 14px;
+    font-weight: 500;
     font-size: 12px;
 }
 QPushButton:hover {
-    background-color: #334155;
-    border-color: #475569;
+    background-color: #27272a;
+    border-color: #3f3f46;
 }
 QPushButton:pressed {
-    background-color: #0f172a;
+    background-color: #09090b;
 }
-QPushButton#deployBtn {
-    background-color: #0284c7;
-    border-color: #38bdf8;
-    color: #ffffff;
+
+/* Shadcn Primary Button (High-contrast clean white) */
+QPushButton#primaryBtn {
+    background-color: #fafafa;
+    color: #09090b;
+    border: 1px solid #ffffff;
+    font-weight: 600;
 }
-QPushButton#deployBtn:hover {
-    background-color: #0369a1;
+QPushButton#primaryBtn:hover {
+    background-color: #e4e4e7;
+    border-color: #e4e4e7;
 }
-QPushButton#rthBtn {
-    background-color: #059669;
-    border-color: #34d399;
-    color: #ffffff;
+QPushButton#primaryBtn:pressed {
+    background-color: #d4d4d8;
 }
-QPushButton#rthBtn:hover {
-    background-color: #047857;
-}
-QPushButton#estopBtn {
+
+/* Shadcn Destructive Button */
+QPushButton#destructiveBtn {
     background-color: #dc2626;
-    border-color: #f87171;
     color: #ffffff;
-    font-size: 13px;
-    font-weight: bold;
+    border: 1px solid #ef4444;
+    font-weight: 600;
 }
-QPushButton#estopBtn:hover {
+QPushButton#destructiveBtn:hover {
     background-color: #b91c1c;
+    border-color: #dc2626;
 }
+QPushButton#destructiveBtn:pressed {
+    background-color: #991b1b;
+}
+
+/* Select / Dropdown */
 QComboBox {
-    background-color: #162232;
-    border: 1px solid #334155;
+    background-color: #18181b;
+    border: 1px solid #27272a;
     border-radius: 6px;
-    padding: 6px 10px;
-    color: #f8fafc;
+    padding: 6px 12px;
+    color: #fafafa;
+    font-size: 12px;
 }
-QComboBox::drop-down {
-    border: none;
+QComboBox:hover {
+    border-color: #3f3f46;
 }
+QComboBox QAbstractItemView {
+    background-color: #18181b;
+    border: 1px solid #27272a;
+    selection-background-color: #27272a;
+    selection-color: #fafafa;
+    color: #f4f4f5;
+    padding: 4px;
+}
+
+/* Sliders */
 QSlider::groove:horizontal {
-    height: 6px;
-    background: #1e293b;
-    border-radius: 3px;
+    height: 4px;
+    background: #27272a;
+    border-radius: 2px;
 }
 QSlider::sub-page:horizontal {
-    background: #0284c7;
-    border-radius: 3px;
+    background: #38bdf8;
+    border-radius: 2px;
 }
 QSlider::handle:horizontal {
-    background: #38bdf8;
-    border: 2px solid #0c4a6e;
-    width: 16px;
+    background: #fafafa;
+    border: 1px solid #71717a;
+    width: 14px;
     margin-top: -5px;
     margin-bottom: -5px;
-    border-radius: 8px;
+    border-radius: 7px;
 }
+QSlider::handle:horizontal:hover {
+    background: #ffffff;
+    border-color: #fafafa;
+}
+
+/* Checkbox */
+QCheckBox {
+    color: #a1a1aa;
+    font-size: 12px;
+    spacing: 8px;
+}
+QCheckBox::indicator {
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+    border: 1px solid #3f3f46;
+    background-color: #18181b;
+}
+QCheckBox::indicator:checked {
+    background-color: #fafafa;
+    border-color: #fafafa;
+}
+
+/* Log Console */
 QTextEdit {
-    background-color: #080d14;
-    border: 1px solid #1e293b;
+    background-color: #0c0c0e;
+    border: 1px solid #27272a;
     border-radius: 6px;
-    color: #38bdf8;
+    color: #e4e4e7;
     font-family: Menlo, Monaco, monospace;
     font-size: 11px;
-}
-QProgressBar {
-    border: 1px solid #334155;
-    border-radius: 4px;
-    text-align: center;
-    background-color: #1e293b;
-    color: white;
-    font-size: 10px;
-    font-weight: bold;
-}
-QProgressBar::chunk {
-    background-color: #10b981;
-    border-radius: 3px;
+    padding: 6px;
 }
 """
 
 
 class MainWindow(QMainWindow):
-    # Signals to communicate with ROS 2 node
     formation_command_signal = pyqtSignal(dict)
     emergency_stop_signal = pyqtSignal(bool)
 
     def __init__(self, ros_node=None):
         super().__init__()
         self.ros_node = ros_node
-        self.setWindowTitle("HERMORD - USV Swarm Ground Station")
+        self.setWindowTitle("HERMORD - Swarm Ground Station")
         self.resize(1200, 780)
-        self.setStyleSheet(DARK_STYLESHEET)
+        self.setStyleSheet(SHADCN_STYLESHEET)
 
         # Swarm State
         self.formation_center = {'x': 0.0, 'y': 0.0}
         self.formation_type = "V-Shape"
         self.formation_spacing = 15.0  # meters
-        self.formation_heading = 90.0  # degrees (East)
+        self.formation_heading = 90.0  # degrees
         self.simulation_enabled = True
 
-        # Initialize USVs (4 standard USVs)
+        # Initialize USVs
         self.usv_fleet = {
             'USV-1': {'x': -15.0, 'y': -15.0, 'heading': 0.0, 'speed': 0.0, 'battery': 94.0, 'status': 'IDLE'},
             'USV-2': {'x': -10.0, 'y': -25.0, 'heading': 0.0, 'speed': 0.0, 'battery': 88.0, 'status': 'IDLE'},
@@ -193,22 +232,22 @@ class MainWindow(QMainWindow):
         self.anim_timer.timeout.connect(self._tick)
         self.anim_timer.start(33)
 
-        self.log_event("Ground Station GUI Initialized. Ready for Swarm Coordination.")
+        self.log_event("Ground Station initialized. Ready for swarm deployment.")
 
     def _init_ui(self):
         central_widget = QWidget(self)
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
-        main_layout.setContentsMargins(12, 10, 12, 12)
+        main_layout.setContentsMargins(14, 12, 14, 14)
         main_layout.setSpacing(10)
 
-        # 1. Top Bar
-        main_layout.addWidget(self._create_top_bar())
+        # 1. Header Bar
+        main_layout.addWidget(self._create_header_bar())
 
-        # 2. Main Content (Splitter: Left Panel, Center Radar, Right Controls)
+        # 2. Splitter Layout: Fleet List (Left) | Tactical Map (Center) | Mission Controls (Right)
         splitter = QSplitter(Qt.Horizontal)
         splitter.addWidget(self._create_fleet_panel())
-        splitter.addWidget(self._create_radar_panel())
+        splitter.addWidget(self._create_map_panel())
         splitter.addWidget(self._create_control_panel())
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 5)
@@ -218,44 +257,56 @@ class MainWindow(QMainWindow):
         # 3. Bottom Log Console
         main_layout.addWidget(self._create_log_panel())
 
-    def _create_top_bar(self):
+    def _create_header_bar(self):
         bar = QFrame()
-        bar.setStyleSheet("background-color: #111a26; border-radius: 8px; border: 1px solid #1e293b; padding: 4px;")
+        bar.setStyleSheet("background-color: #121215; border-radius: 8px; border: 1px solid #27272a; padding: 4px;")
         layout = QHBoxLayout(bar)
-        layout.setContentsMargins(12, 6, 12, 6)
+        layout.setContentsMargins(14, 8, 14, 8)
 
-        # Title
-        title_label = QLabel("HERMORD GROUND STATION // USV SWARM")
-        title_label.setStyleSheet("font-size: 15px; font-weight: bold; color: #38bdf8; letter-spacing: 1px;")
-        layout.addWidget(title_label)
+        # Title & Subtitle
+        title_box = QHBoxLayout()
+        title_label = QLabel("Ground Station")
+        title_label.setStyleSheet("font-size: 14px; font-weight: 600; color: #fafafa;")
+        title_box.addWidget(title_label)
 
+        ver_badge = QLabel("v0.1.0")
+        ver_badge.setStyleSheet("color: #71717a; font-size: 11px; padding: 2px 6px; background: #18181b; border-radius: 4px; border: 1px solid #27272a;")
+        title_box.addWidget(ver_badge)
+
+        sep = QLabel("/")
+        sep.setStyleSheet("color: #3f3f46; font-size: 13px;")
+        title_box.addWidget(sep)
+
+        sub_label = QLabel("USV Swarm Formation Controller")
+        sub_label.setStyleSheet("font-size: 12px; color: #a1a1aa; font-weight: 400;")
+        title_box.addWidget(sub_label)
+
+        layout.addLayout(title_box)
         layout.addStretch()
 
-        # ROS 2 Status Badge
-        self.ros_badge = QLabel("● ROS 2: ONLINE")
-        self.ros_badge.setStyleSheet("color: #10b981; font-weight: bold; font-size: 11px; padding: 4px 8px; background: #064e3b; border-radius: 4px;")
+        # Status Pills
+        self.ros_badge = QLabel("● ROS 2 Connected")
+        self.ros_badge.setStyleSheet("color: #34d399; font-weight: 500; font-size: 11px; padding: 3px 10px; background: #064e3b; border-radius: 9999px; border: 1px solid #047857;")
         layout.addWidget(self.ros_badge)
 
-        # Fleet Count Badge
-        self.fleet_badge = QLabel("FLEET: 4 USVs")
-        self.fleet_badge.setStyleSheet("color: #e2e8f0; font-weight: bold; font-size: 11px; padding: 4px 8px; background: #1e293b; border-radius: 4px;")
+        self.fleet_badge = QLabel("4 USVs Active")
+        self.fleet_badge.setStyleSheet("color: #e4e4e7; font-weight: 500; font-size: 11px; padding: 3px 10px; background: #18181b; border-radius: 9999px; border: 1px solid #27272a;")
         layout.addWidget(self.fleet_badge)
 
-        # Uptime Label
-        self.uptime_label = QLabel("UPTIME: 00:00")
-        self.uptime_label.setStyleSheet("color: #94a3b8; font-size: 11px; font-weight: 500;")
+        self.uptime_label = QLabel("00:00")
+        self.uptime_label.setStyleSheet("color: #71717a; font-size: 11px; font-family: Menlo, monospace;")
         layout.addWidget(self.uptime_label)
 
         return bar
 
     def _create_fleet_panel(self):
-        group = QGroupBox("Swarm Fleet Status")
+        group = QGroupBox("Fleet Telemetry")
         layout = QVBoxLayout(group)
-        layout.setSpacing(8)
+        layout.setSpacing(10)
 
         # Table of USVs
         self.fleet_table = QTableWidget(len(self.usv_fleet), 5)
-        self.fleet_table.setHorizontalHeaderLabels(["ID", "Pos (m)", "Spd", "Bat", "Status"])
+        self.fleet_table.setHorizontalHeaderLabels(["Vehicle", "Position", "Speed", "Battery", "Status"])
         self.fleet_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.fleet_table.verticalHeader().setVisible(False)
         self.fleet_table.setSelectionBehavior(QTableWidget.SelectRows)
@@ -269,24 +320,30 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(self.fleet_table)
 
-        # Swarm quick stats
-        stats_frame = QFrame()
-        stats_frame.setStyleSheet("background-color: #0c141f; border-radius: 6px; padding: 6px;")
-        s_layout = QGridLayout(stats_frame)
-        s_layout.addWidget(QLabel("Avg Battery:"), 0, 0)
+        # Minimalist metrics row
+        metrics_frame = QFrame()
+        metrics_frame.setStyleSheet("background-color: #0c0c0e; border: 1px solid #27272a; border-radius: 6px; padding: 8px;")
+        m_layout = QGridLayout(metrics_frame)
+        m_layout.setContentsMargins(8, 6, 8, 6)
+
+        m_layout.addWidget(QLabel("Fleet Battery:"), 0, 0)
         self.avg_bat_lbl = QLabel("89%")
-        self.avg_bat_lbl.setStyleSheet("color: #10b981; font-weight: bold;")
-        s_layout.addWidget(self.avg_bat_lbl, 0, 1)
+        self.avg_bat_lbl.setStyleSheet("color: #34d399; font-weight: 600;")
+        m_layout.addWidget(self.avg_bat_lbl, 0, 1)
 
-        s_layout.addWidget(QLabel("Swarm Center:"), 1, 0)
+        m_layout.addWidget(QLabel("Swarm Centroid:"), 1, 0)
         self.swarm_center_lbl = QLabel("(0.0m, 0.0m)")
-        s_layout.addWidget(self.swarm_center_lbl, 1, 1)
+        self.swarm_center_lbl.setStyleSheet("color: #a1a1aa; font-family: Menlo, monospace; font-size: 11px;")
+        m_layout.addWidget(self.swarm_center_lbl, 1, 1)
 
-        layout.addWidget(stats_frame)
+        layout.addWidget(metrics_frame)
 
-        # Swarm Fleet Size selector
+        # Fleet size selector
         size_layout = QHBoxLayout()
-        size_layout.addWidget(QLabel("Fleet Count:"))
+        size_lbl = QLabel("Swarm Size:")
+        size_lbl.setStyleSheet("color: #a1a1aa; font-size: 12px;")
+        size_layout.addWidget(size_lbl)
+
         self.fleet_count_combo = QComboBox()
         self.fleet_count_combo.addItems(["2 USVs", "3 USVs", "4 USVs", "5 USVs", "6 USVs"])
         self.fleet_count_combo.setCurrentText("4 USVs")
@@ -296,101 +353,120 @@ class MainWindow(QMainWindow):
 
         return group
 
-    def _create_radar_panel(self):
-        group = QGroupBox("Tactical Radar & Waypoints")
+    def _create_map_panel(self):
+        group = QGroupBox("Tactical Map Canvas")
         layout = QVBoxLayout(group)
-        layout.setSpacing(6)
+        layout.setSpacing(8)
 
-        # Radar Widget
+        # Tactical Canvas (No rotating radar sweep)
         self.radar = RadarWidget()
         self.radar.waypoint_selected.connect(self._on_waypoint_selected)
         layout.addWidget(self.radar, stretch=1)
 
-        # Radar controls bar
+        # Clean Toolbar under map
         ctrl_bar = QHBoxLayout()
-        reset_btn = QPushButton("Reset Center")
+        reset_btn = QPushButton("Center View")
         reset_btn.clicked.connect(self.radar.reset_view)
         ctrl_bar.addWidget(reset_btn)
 
-        zoom_in_btn = QPushButton("Zoom In (+)")
-        zoom_in_btn.clicked.connect(lambda: setattr(self.radar, 'scale', min(40.0, self.radar.scale * 1.25)))
+        zoom_in_btn = QPushButton("+ Zoom")
+        zoom_in_btn.clicked.connect(lambda: setattr(self.radar, 'scale', min(50.0, self.radar.scale * 1.2)))
         ctrl_bar.addWidget(zoom_in_btn)
 
-        zoom_out_btn = QPushButton("Zoom Out (-)")
-        zoom_out_btn.clicked.connect(lambda: setattr(self.radar, 'scale', max(1.5, self.radar.scale * 0.8)))
+        zoom_out_btn = QPushButton("- Zoom")
+        zoom_out_btn.clicked.connect(lambda: setattr(self.radar, 'scale', max(2.0, self.radar.scale * 0.8)))
         ctrl_bar.addWidget(zoom_out_btn)
 
-        self.waypoint_lbl = QLabel("Target: (0.0, 0.0)m")
-        self.waypoint_lbl.setStyleSheet("color: #f59e0b; font-weight: 500; font-size: 11px;")
         ctrl_bar.addStretch()
+
+        self.waypoint_lbl = QLabel("Target: (0.0, 0.0)m")
+        self.waypoint_lbl.setStyleSheet("color: #38bdf8; font-family: Menlo, monospace; font-size: 11px; background: #18181b; padding: 4px 8px; border-radius: 4px; border: 1px solid #27272a;")
         ctrl_bar.addWidget(self.waypoint_lbl)
 
         layout.addLayout(ctrl_bar)
         return group
 
     def _create_control_panel(self):
-        group = QGroupBox("Formation & Mission Control")
+        group = QGroupBox("Mission Controls")
         layout = QVBoxLayout(group)
-        layout.setSpacing(10)
+        layout.setSpacing(12)
 
-        # Formation Shape
-        layout.addWidget(QLabel("Formation Geometry:"))
+        # Formation Geometry Selection
+        geom_label = QLabel("Formation Pattern")
+        geom_label.setStyleSheet("color: #a1a1aa; font-size: 12px; font-weight: 500;")
+        layout.addWidget(geom_label)
+
         self.form_combo = QComboBox()
         self.form_combo.addItems(["V-Shape", "Line (Abeam)", "Column (In-line)", "Circle", "Diamond"])
         self.form_combo.currentTextChanged.connect(self._on_formation_type_changed)
         layout.addWidget(self.form_combo)
 
         # Spacing Slider
-        self.spacing_lbl = QLabel(f"Vehicle Spacing: {int(self.formation_spacing)} m")
-        layout.addWidget(self.spacing_lbl)
+        spacing_header = QHBoxLayout()
+        spacing_title = QLabel("Spacing")
+        spacing_title.setStyleSheet("color: #a1a1aa; font-size: 12px;")
+        spacing_header.addWidget(spacing_title)
+        spacing_header.addStretch()
+        self.spacing_val_lbl = QLabel(f"{int(self.formation_spacing)} m")
+        self.spacing_val_lbl.setStyleSheet("color: #fafafa; font-weight: 600; font-size: 11px; background: #18181b; padding: 2px 6px; border-radius: 4px; border: 1px solid #27272a;")
+        spacing_header.addWidget(self.spacing_val_lbl)
+        layout.addLayout(spacing_header)
+
         self.spacing_slider = QSlider(Qt.Horizontal)
         self.spacing_slider.setRange(5, 50)
         self.spacing_slider.setValue(int(self.formation_spacing))
         self.spacing_slider.valueChanged.connect(self._on_spacing_changed)
         layout.addWidget(self.spacing_slider)
 
-        # Heading / Bearing Slider
-        self.heading_lbl = QLabel(f"Formation Bearing: {int(self.formation_heading)}° (East)")
-        layout.addWidget(self.heading_lbl)
+        # Bearing Slider
+        bearing_header = QHBoxLayout()
+        bearing_title = QLabel("Bearing")
+        bearing_title.setStyleSheet("color: #a1a1aa; font-size: 12px;")
+        bearing_header.addWidget(bearing_title)
+        bearing_header.addStretch()
+        self.heading_val_lbl = QLabel(f"{int(self.formation_heading)}°")
+        self.heading_val_lbl.setStyleSheet("color: #fafafa; font-weight: 600; font-size: 11px; background: #18181b; padding: 2px 6px; border-radius: 4px; border: 1px solid #27272a;")
+        bearing_header.addWidget(self.heading_val_lbl)
+        layout.addLayout(bearing_header)
+
         self.heading_slider = QSlider(Qt.Horizontal)
         self.heading_slider.setRange(0, 359)
         self.heading_slider.setValue(int(self.formation_heading))
         self.heading_slider.valueChanged.connect(self._on_heading_changed)
         layout.addWidget(self.heading_slider)
 
-        # Simulation Mode Checkbox
-        self.sim_checkbox = QCheckBox("Simulate Swarm Physics")
+        # Physics Simulation Toggle
+        self.sim_checkbox = QCheckBox("Simulate Swarm Kinematics")
         self.sim_checkbox.setChecked(True)
         self.sim_checkbox.toggled.connect(lambda val: setattr(self, 'simulation_enabled', val))
-        self.sim_checkbox.setStyleSheet("color: #38bdf8; font-weight: 500;")
         layout.addWidget(self.sim_checkbox)
 
         layout.addSpacing(6)
 
-        # Action Buttons
-        self.deploy_btn = QPushButton("DEPLOY FORMATION")
-        self.deploy_btn.setObjectName("deployBtn")
+        # Primary Action Button
+        self.deploy_btn = QPushButton("Deploy Formation")
+        self.deploy_btn.setObjectName("primaryBtn")
         self.deploy_btn.setFixedHeight(36)
         self.deploy_btn.clicked.connect(self._deploy_formation)
         layout.addWidget(self.deploy_btn)
 
-        self.hold_btn = QPushButton("HOLD / DISPERSE")
-        self.hold_btn.setFixedHeight(34)
+        # Secondary Action Buttons
+        self.hold_btn = QPushButton("Hold Position")
+        self.hold_btn.setFixedHeight(32)
         self.hold_btn.clicked.connect(self._hold_position)
         layout.addWidget(self.hold_btn)
 
-        self.rth_btn = QPushButton("RETURN TO HOME (RTH)")
-        self.rth_btn.setObjectName("rthBtn")
-        self.rth_btn.setFixedHeight(34)
+        self.rth_btn = QPushButton("Return to Origin")
+        self.rth_btn.setFixedHeight(32)
         self.rth_btn.clicked.connect(self._return_home)
         layout.addWidget(self.rth_btn)
 
         layout.addSpacing(10)
 
-        # Emergency Stop
-        self.estop_btn = QPushButton("⚠ EMERGENCY STOP")
-        self.estop_btn.setObjectName("estopBtn")
-        self.estop_btn.setFixedHeight(44)
+        # Destructive Action Button
+        self.estop_btn = QPushButton("Emergency Stop")
+        self.estop_btn.setObjectName("destructiveBtn")
+        self.estop_btn.setFixedHeight(38)
         self.estop_btn.clicked.connect(self._emergency_stop)
         layout.addWidget(self.estop_btn)
 
@@ -398,13 +474,13 @@ class MainWindow(QMainWindow):
         return group
 
     def _create_log_panel(self):
-        group = QGroupBox("ROS 2 Mission Log & Telemetry Console")
+        group = QGroupBox("Activity & Telemetry Log")
         layout = QVBoxLayout(group)
         layout.setSpacing(4)
 
         self.log_console = QTextEdit()
         self.log_console.setReadOnly(True)
-        self.log_console.setMaximumHeight(120)
+        self.log_console.setMaximumHeight(110)
         layout.addWidget(self.log_console)
 
         return group
@@ -419,29 +495,25 @@ class MainWindow(QMainWindow):
 
         cx, cy = self.formation_center['x'], self.formation_center['y']
         bearing_rad = math.radians(self.formation_heading)
-        # Formation forward vector
         fx = math.cos(bearing_rad)
         fy = math.sin(bearing_rad)
-        # Formation right/lateral vector (90 deg CW from forward)
         rx = math.sin(bearing_rad)
         ry = -math.cos(bearing_rad)
 
         d = self.formation_spacing
 
         if self.formation_type == "V-Shape":
-            # Leader at apex, followers alternating left/right behind
             for i, usv_id in enumerate(usv_ids):
                 if i == 0:
                     targets[usv_id] = {'x': cx, 'y': cy}
                 else:
                     tier = (i + 1) // 2
-                    side = -1 if (i % 2 == 1) else 1  # -1 is port/left, +1 is starboard/right
+                    side = -1 if (i % 2 == 1) else 1
                     tx = cx - tier * d * fx + side * tier * d * rx
                     ty = cy - tier * d * fy + side * tier * d * ry
                     targets[usv_id] = {'x': tx, 'y': ty}
 
         elif self.formation_type == "Line (Abeam)":
-            # Lateral line perpendicular to heading
             mid = (n - 1) / 2.0
             for i, usv_id in enumerate(usv_ids):
                 offset = (i - mid) * d
@@ -450,7 +522,6 @@ class MainWindow(QMainWindow):
                 targets[usv_id] = {'x': tx, 'y': ty}
 
         elif self.formation_type == "Column (In-line)":
-            # Single file line along heading vector
             mid = (n - 1) / 2.0
             for i, usv_id in enumerate(usv_ids):
                 offset = (mid - i) * d
@@ -467,12 +538,7 @@ class MainWindow(QMainWindow):
                 targets[usv_id] = {'x': tx, 'y': ty}
 
         elif self.formation_type == "Diamond":
-            positions = [
-                (1, 0),   # Front
-                (0, -1),  # Left
-                (0, 1),   # Right
-                (-1, 0),  # Rear
-            ]
+            positions = [(1, 0), (0, -1), (0, 1), (-1, 0)]
             for i, usv_id in enumerate(usv_ids):
                 px, py = positions[i % len(positions)]
                 tier = (i // len(positions)) + 1
@@ -487,23 +553,20 @@ class MainWindow(QMainWindow):
     def _on_formation_type_changed(self, text):
         self.formation_type = text
         self._calculate_formation_targets()
-        self.log_event(f"Formation changed to: {text}")
+        self.log_event(f"Formation pattern changed to: {text}")
 
     def _on_spacing_changed(self, value):
         self.formation_spacing = float(value)
-        self.spacing_lbl.setText(f"Vehicle Spacing: {value} m")
+        self.spacing_val_lbl.setText(f"{value} m")
         self._calculate_formation_targets()
 
     def _on_heading_changed(self, value):
         self.formation_heading = float(value)
-        directions = ["East", "NE", "North", "NW", "West", "SW", "South", "SE", "East"]
-        dir_idx = int((value + 22.5) // 45) % 8
-        self.heading_lbl.setText(f"Formation Bearing: {value}° ({directions[dir_idx]})")
+        self.heading_val_lbl.setText(f"{value}°")
         self._calculate_formation_targets()
 
     def _on_fleet_count_changed(self, text):
         count = int(text.split()[0])
-        # Rebuild fleet dict
         new_fleet = {}
         for i in range(1, count + 1):
             uid = f"USV-{i}"
@@ -517,7 +580,7 @@ class MainWindow(QMainWindow):
                 }
         self.usv_fleet = new_fleet
         self.radar.usvs.clear()
-        self.fleet_badge.setText(f"FLEET: {count} USVs")
+        self.fleet_badge.setText(f"{count} USVs Active")
         self._update_fleet_table_structure()
         self._calculate_formation_targets()
         self.log_event(f"Swarm size updated to {count} vehicles.")
@@ -535,7 +598,7 @@ class MainWindow(QMainWindow):
         self.formation_center = {'x': wx, 'y': wy}
         self.waypoint_lbl.setText(f"Target: ({wx:.1f}, {wy:.1f})m")
         self._calculate_formation_targets()
-        self.log_event(f"New formation center designated at ({wx:.1f}m, {wy:.1f}m)")
+        self.log_event(f"Target destination updated to ({wx:.1f}m, {wy:.1f}m)")
 
     def _deploy_formation(self):
         targets = self._calculate_formation_targets()
@@ -552,34 +615,27 @@ class MainWindow(QMainWindow):
             'timestamp': time.time()
         }
         self.formation_command_signal.emit(cmd)
-        self.log_event(f"[PUB -> /ground_station/formation_cmd] Deployed {self.formation_type} to {len(targets)} USVs")
+        self.log_event(f"[PUB -> /ground_station/formation_cmd] Deployed {self.formation_type} ({len(targets)} vehicles)")
 
     def _hold_position(self):
         for usv_id in self.usv_fleet:
             self.usv_fleet[usv_id]['status'] = 'HOLD'
             self.usv_fleet[usv_id]['speed'] = 0.0
 
-        cmd = {
-            'action': 'HOLD',
-            'timestamp': time.time()
-        }
+        cmd = {'action': 'HOLD', 'timestamp': time.time()}
         self.formation_command_signal.emit(cmd)
         self.log_event("[PUB -> /ground_station/formation_cmd] Commanded HOLD position.")
 
     def _return_home(self):
         self.formation_center = {'x': 0.0, 'y': 0.0}
-        self.waypoint_lbl.setText("Target: (0.0, 0.0)m [HOME]")
+        self.waypoint_lbl.setText("Target: (0.0, 0.0)m")
         self._calculate_formation_targets()
         for usv_id in self.usv_fleet:
             self.usv_fleet[usv_id]['status'] = 'RTH'
 
-        cmd = {
-            'action': 'RETURN_HOME',
-            'target': {'x': 0.0, 'y': 0.0},
-            'timestamp': time.time()
-        }
+        cmd = {'action': 'RETURN_HOME', 'target': {'x': 0.0, 'y': 0.0}, 'timestamp': time.time()}
         self.formation_command_signal.emit(cmd)
-        self.log_event("[PUB -> /ground_station/formation_cmd] Commanded RETURN TO HOME (0, 0).")
+        self.log_event("[PUB -> /ground_station/formation_cmd] Commanded RETURN TO ORIGIN.")
 
     def _emergency_stop(self):
         for usv_id in self.usv_fleet:
@@ -589,22 +645,19 @@ class MainWindow(QMainWindow):
         self.emergency_stop_signal.emit(True)
         self.log_event("⚠ [PUB -> /ground_station/emergency_stop] EMERGENCY STOP TRIGGERED!")
 
-    # --- Swarm Simulation Physics & Animation Loop ---
+    # --- Swarm Kinematics Simulation ---
     def _tick(self):
-        # Update Uptime
         elapsed = int(time.time() - self.start_time)
         mins, secs = divmod(elapsed, 60)
-        self.uptime_label.setText(f"UPTIME: {mins:02d}:{secs:02d}")
+        self.uptime_label.setText(f"{mins:02d}:{secs:02d}")
 
-        # Update Radar Sweep
         self.radar.update_animation()
 
-        # Swarm Physics Simulation
         if self.simulation_enabled:
             targets = self.radar.formation_targets
-            dt = 0.033  # seconds
-            max_speed = 3.5  # m/s (~7 knots)
-            max_turn_rate = 1.8  # rad/s
+            dt = 0.033
+            max_speed = 3.5
+            max_turn_rate = 1.8
 
             for usv_id, data in self.usv_fleet.items():
                 if data['status'] in ('FORMATION', 'RTH') and usv_id in targets:
@@ -614,14 +667,13 @@ class MainWindow(QMainWindow):
                     dy = ty - data['y']
                     dist = math.hypot(dx, dy)
 
-                    if dist > 0.4:
+                    if dist > 0.3:
                         desired_heading = math.atan2(dy, dx)
                         angle_diff = (desired_heading - data['heading'] + math.pi) % (2 * math.pi) - math.pi
                         turn = max(-max_turn_rate * dt, min(max_turn_rate * dt, angle_diff * 2.0))
                         data['heading'] += turn
 
-                        # Speed slows down as approaching target
-                        target_spd = min(max_speed, max(0.5, dist * 0.8))
+                        target_spd = min(max_speed, max(0.4, dist * 0.8))
                         data['speed'] = target_spd
 
                         data['x'] += math.cos(data['heading']) * data['speed'] * dt
@@ -629,8 +681,7 @@ class MainWindow(QMainWindow):
                     else:
                         data['speed'] = 0.0
 
-                    # Slight battery depletion
-                    data['battery'] = max(0.0, data['battery'] - 0.002)
+                    data['battery'] = max(0.0, data['battery'] - 0.001)
 
                 self.radar.set_usv_state(usv_id, data['x'], data['y'], data['heading'], data['status'])
 
@@ -654,5 +705,5 @@ class MainWindow(QMainWindow):
 
     def log_event(self, message):
         timestamp = time.strftime("%H:%M:%S")
-        self.log_console.append(f"<span style='color:#64748b;'>[{timestamp}]</span> {message}")
+        self.log_console.append(f"<span style='color:#71717a;'>[{timestamp}]</span> {message}")
         self.log_console.verticalScrollBar().setValue(self.log_console.verticalScrollBar().maximum())
