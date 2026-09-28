@@ -14,6 +14,8 @@ from PyQt5.QtWidgets import QWidget
 class RadarWidget(QWidget):
     # Emitted when user clicks to set a new formation waypoint (x_meters, y_meters)
     waypoint_selected = pyqtSignal(float, float)
+    # Emitted when user clicks or selects a USV (usv_id)
+    usv_selected = pyqtSignal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -27,11 +29,10 @@ class RadarWidget(QWidget):
         self._last_mouse_pos = None
 
         # Swarm data
-        # Dict of usv_id -> {'x': float, 'y': float, 'heading': float, 'color': QColor, 'status': str}
         self.usvs = {}
-        # Dict of usv_id -> {'x': float, 'y': float}
         self.formation_targets = {}
         self.formation_name = "V-Shape"
+        self.selected_usv = "USV-1"
 
         # Modern Shadcn-inspired palette
         self.c_bg = QColor(12, 12, 14)           # Deep neutral zinc
@@ -85,6 +86,13 @@ class RadarWidget(QWidget):
         self.scale = 10.0
         self.update()
 
+    def focus_usv(self, usv_id):
+        self.selected_usv = usv_id
+        if usv_id in self.usvs:
+            data = self.usvs[usv_id]
+            self.pan_offset = QPointF(-data['x'] * self.scale, data['y'] * self.scale)
+        self.update()
+
     # --- Coordinate Transformations ---
     def world_to_screen(self, wx, wy):
         cx = self.width() / 2.0 + self.pan_offset.x()
@@ -107,8 +115,22 @@ class RadarWidget(QWidget):
             self._dragging = True
             self._last_mouse_pos = event.pos()
         elif event.button() == Qt.LeftButton:
-            wx, wy = self.screen_to_world(event.x(), event.y())
-            self.waypoint_selected.emit(wx, wy)
+            # Check if user clicked directly on any USV (within 22px)
+            clicked_usv = None
+            for usv_id, data in self.usvs.items():
+                sp = self.world_to_screen(data['x'], data['y'])
+                dist_px = math.hypot(event.x() - sp.x(), event.y() - sp.y())
+                if dist_px < 22.0:
+                    clicked_usv = usv_id
+                    break
+
+            if clicked_usv is not None:
+                self.selected_usv = clicked_usv
+                self.usv_selected.emit(clicked_usv)
+                self.update()
+            else:
+                wx, wy = self.screen_to_world(event.x(), event.y())
+                self.waypoint_selected.emit(wx, wy)
 
     def mouseMoveEvent(self, event):
         if self._dragging and self._last_mouse_pos is not None:
@@ -244,6 +266,34 @@ class RadarWidget(QWidget):
             sp = self.world_to_screen(data['x'], data['y'])
             heading = data.get('heading', 0.0)
             color = data.get('color', QColor(56, 189, 248))
+            is_selected = (usv_id == self.selected_usv)
+
+            # If selected: draw guidance vector to target slot & distance
+            if is_selected and usv_id in self.formation_targets:
+                slot_pos = self.formation_targets[usv_id]
+                slot_sp = self.world_to_screen(slot_pos['x'], slot_pos['y'])
+                guide_pen = QPen(QColor(56, 189, 248, 180), 1.5, Qt.DashLine)
+                painter.setPen(guide_pen)
+                painter.drawLine(sp, slot_sp)
+
+                dist_to_slot = math.hypot(slot_pos['x'] - data['x'], slot_pos['y'] - data['y'])
+                mid_x = (sp.x() + slot_sp.x()) / 2.0
+                mid_y = (sp.y() + slot_sp.y()) / 2.0
+                painter.setFont(QFont("Menlo", 8))
+                painter.setPen(QColor(56, 189, 248, 220))
+                painter.drawText(int(mid_x + 6), int(mid_y), f"d: {dist_to_slot:.1f}m")
+                painter.setFont(QFont("Helvetica Neue", 8, QFont.Bold))
+
+            # Selection Highlight Ring
+            if is_selected:
+                painter.setPen(QPen(QColor(56, 189, 248, 230), 1.5, Qt.DashLine))
+                painter.setBrush(QBrush(QColor(56, 189, 248, 25)))
+                painter.drawEllipse(sp, 20, 20)
+
+                # Outer pulse bracket
+                painter.setPen(QPen(QColor(244, 244, 245, 140), 1))
+                painter.setBrush(Qt.NoBrush)
+                painter.drawEllipse(sp, 24, 24)
 
             # Breadcrumb trail
             trail = data.get('trail', [])
@@ -272,29 +322,31 @@ class RadarWidget(QWidget):
             ])
 
             # Fill & border
-            painter.setPen(QPen(QColor(255, 255, 255, 220), 1.5))
+            border_col = QColor(255, 255, 255, 255) if is_selected else QColor(255, 255, 255, 200)
+            painter.setPen(QPen(border_col, 2.0 if is_selected else 1.5))
             painter.setBrush(QBrush(color))
             painter.drawPolygon(vessel_poly)
 
             # Heading vector line
-            painter.setPen(QPen(QColor(255, 255, 255, 140), 1, Qt.DashLine))
-            painter.drawLine(QPointF(11, 0), QPointF(22, 0))
+            painter.setPen(QPen(QColor(255, 255, 255, 180 if is_selected else 120), 1, Qt.DashLine))
+            painter.drawLine(QPointF(11, 0), QPointF(24 if is_selected else 18, 0))
 
             painter.restore()
 
             # Vessel Tag Pill
-            tag_text = f"{usv_id}"
+            tag_text = f"★ {usv_id}" if is_selected else f"{usv_id}"
             fm = painter.fontMetrics()
             text_w = fm.horizontalAdvance(tag_text) + 12
             pill_rect = QRectF(sp.x() + 10, sp.y() - 18, text_w, 16)
 
             # Pill background
-            painter.setPen(QPen(QColor(39, 39, 44), 1))
-            painter.setBrush(QBrush(QColor(24, 24, 27, 220)))
+            border_pen = QPen(QColor(56, 189, 248) if is_selected else QColor(39, 39, 44), 1.5 if is_selected else 1.0)
+            painter.setPen(border_pen)
+            painter.setBrush(QBrush(QColor(18, 18, 21, 230)))
             painter.drawRoundedRect(pill_rect, 4, 4)
 
             # Pill text
-            painter.setPen(self.c_text_main)
+            painter.setPen(QColor(56, 189, 248) if is_selected else self.c_text_main)
             painter.drawText(int(sp.x() + 16), int(sp.y() - 6), tag_text)
 
     def _draw_hud(self, painter, w, h):

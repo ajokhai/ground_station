@@ -86,8 +86,15 @@ def main(args=None):
     window.emergency_stop_signal.connect(ros_node.publish_emergency_stop)
 
     # Integrate ROS 2 event loop with Qt event loop via QTimer
+    def _safe_ros_spin():
+        if rclpy.ok():
+            try:
+                rclpy.spin_once(ros_node, timeout_sec=0)
+            except Exception:
+                pass
+
     ros_spin_timer = QTimer()
-    ros_spin_timer.timeout.connect(lambda: rclpy.spin_once(ros_node, timeout_sec=0))
+    ros_spin_timer.timeout.connect(_safe_ros_spin)
     ros_spin_timer.start(20)  # Spin at 50 Hz
 
     # Center window on screen

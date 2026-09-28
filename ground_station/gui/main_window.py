@@ -223,9 +223,11 @@ class MainWindow(QMainWindow):
             'USV-4': {'x': 15.0,  'y': -15.0, 'heading': 0.0, 'speed': 0.0, 'battery': 85.0, 'status': 'IDLE'},
         }
 
+        self.selected_usv = "USV-1"
         self.start_time = time.time()
         self._init_ui()
         self._calculate_formation_targets()
+        self._select_usv("USV-1")
 
         # Animation & Physics Timer (30 Hz)
         self.anim_timer = QTimer(self)
@@ -302,7 +304,7 @@ class MainWindow(QMainWindow):
     def _create_fleet_panel(self):
         group = QGroupBox("Fleet Telemetry")
         layout = QVBoxLayout(group)
-        layout.setSpacing(10)
+        layout.setSpacing(8)
 
         # Table of USVs
         self.fleet_table = QTableWidget(len(self.usv_fleet), 5)
@@ -310,6 +312,8 @@ class MainWindow(QMainWindow):
         self.fleet_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.fleet_table.verticalHeader().setVisible(False)
         self.fleet_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.fleet_table.setSelectionMode(QTableWidget.SingleSelection)
+        self.fleet_table.itemSelectionChanged.connect(self._on_table_selection_changed)
 
         for row, (usv_id, data) in enumerate(self.usv_fleet.items()):
             self.fleet_table.setItem(row, 0, QTableWidgetItem(usv_id))
@@ -318,13 +322,86 @@ class MainWindow(QMainWindow):
             self.fleet_table.setItem(row, 3, QTableWidgetItem(f"{int(data['battery'])}%"))
             self.fleet_table.setItem(row, 4, QTableWidgetItem(data['status']))
 
-        layout.addWidget(self.fleet_table)
+        layout.addWidget(self.fleet_table, stretch=1)
+
+        # Selected USV Inspector Card
+        self.inspector_card = QFrame()
+        self.inspector_card.setStyleSheet("background-color: #0c0c0e; border: 1px solid #27272a; border-radius: 6px; padding: 10px;")
+        ins_layout = QVBoxLayout(self.inspector_card)
+        ins_layout.setContentsMargins(10, 8, 10, 8)
+        ins_layout.setSpacing(6)
+
+        # Inspector Header
+        ins_header = QHBoxLayout()
+        self.ins_title = QLabel("USV-1 Telemetry")
+        self.ins_title.setStyleSheet("font-weight: 600; font-size: 13px; color: #38bdf8;")
+        ins_header.addWidget(self.ins_title)
+        ins_header.addStretch()
+
+        self.ins_status_pill = QLabel("● IDLE")
+        self.ins_status_pill.setStyleSheet("font-size: 10px; font-weight: 600; padding: 2px 6px; background: #18181b; border: 1px solid #27272a; border-radius: 4px; color: #a1a1aa;")
+        ins_header.addWidget(self.ins_status_pill)
+        ins_layout.addLayout(ins_header)
+
+        # Detail Grid
+        t_grid = QGridLayout()
+        t_grid.setHorizontalSpacing(8)
+        t_grid.setVerticalSpacing(4)
+
+        t_grid.addWidget(QLabel("Coordinates:"), 0, 0)
+        self.ins_pos = QLabel("X: -15.0m, Y: -15.0m")
+        self.ins_pos.setStyleSheet("color: #fafafa; font-family: Menlo, monospace; font-size: 11px;")
+        t_grid.addWidget(self.ins_pos, 0, 1)
+
+        t_grid.addWidget(QLabel("Heading:"), 1, 0)
+        self.ins_hdg = QLabel("0° (East)")
+        self.ins_hdg.setStyleSheet("color: #fafafa; font-size: 11px;")
+        t_grid.addWidget(self.ins_hdg, 1, 1)
+
+        t_grid.addWidget(QLabel("Velocity:"), 2, 0)
+        self.ins_spd = QLabel("0.0 m/s (0.0 kts)")
+        self.ins_spd.setStyleSheet("color: #fafafa; font-size: 11px;")
+        t_grid.addWidget(self.ins_spd, 2, 1)
+
+        t_grid.addWidget(QLabel("Slot Distance:"), 3, 0)
+        self.ins_slot_dist = QLabel("0.0 m")
+        self.ins_slot_dist.setStyleSheet("color: #38bdf8; font-family: Menlo, monospace; font-size: 11px;")
+        t_grid.addWidget(self.ins_slot_dist, 3, 1)
+
+        t_grid.addWidget(QLabel("Power System:"), 4, 0)
+        self.ins_bat = QLabel("94% · 24.8V")
+        self.ins_bat.setStyleSheet("color: #34d399; font-weight: 500; font-size: 11px;")
+        t_grid.addWidget(self.ins_bat, 4, 1)
+
+        t_grid.addWidget(QLabel("Link & GPS:"), 5, 0)
+        self.ins_link = QLabel("Fix 3D (14 Sats) · -54 dBm")
+        self.ins_link.setStyleSheet("color: #a1a1aa; font-size: 10px;")
+        t_grid.addWidget(self.ins_link, 5, 1)
+
+        ins_layout.addLayout(t_grid)
+
+        # Inspector Actions Bar
+        ins_btn_layout = QHBoxLayout()
+        self.focus_btn = QPushButton("Focus on Map")
+        self.focus_btn.setFixedHeight(28)
+        self.focus_btn.setStyleSheet("font-size: 11px; padding: 3px 8px;")
+        self.focus_btn.clicked.connect(self._focus_selected_usv)
+        ins_btn_layout.addWidget(self.focus_btn)
+
+        self.solo_hold_btn = QPushButton("Hold Vehicle")
+        self.solo_hold_btn.setFixedHeight(28)
+        self.solo_hold_btn.setStyleSheet("font-size: 11px; padding: 3px 8px;")
+        self.solo_hold_btn.clicked.connect(self._hold_selected_usv)
+        ins_btn_layout.addWidget(self.solo_hold_btn)
+
+        ins_layout.addLayout(ins_btn_layout)
+        layout.addWidget(self.inspector_card)
 
         # Minimalist metrics row
         metrics_frame = QFrame()
-        metrics_frame.setStyleSheet("background-color: #0c0c0e; border: 1px solid #27272a; border-radius: 6px; padding: 8px;")
+        metrics_frame.setStyleSheet("background-color: #0c0c0e; border: 1px solid #27272a; border-radius: 6px; padding: 6px;")
         m_layout = QGridLayout(metrics_frame)
-        m_layout.setContentsMargins(8, 6, 8, 6)
+        m_layout.setContentsMargins(8, 4, 8, 4)
 
         m_layout.addWidget(QLabel("Fleet Battery:"), 0, 0)
         self.avg_bat_lbl = QLabel("89%")
@@ -361,6 +438,7 @@ class MainWindow(QMainWindow):
         # Tactical Canvas (No rotating radar sweep)
         self.radar = RadarWidget()
         self.radar.waypoint_selected.connect(self._on_waypoint_selected)
+        self.radar.usv_selected.connect(self._select_usv)
         layout.addWidget(self.radar, stretch=1)
 
         # Clean Toolbar under map
@@ -586,6 +664,7 @@ class MainWindow(QMainWindow):
         self.log_event(f"Swarm size updated to {count} vehicles.")
 
     def _update_fleet_table_structure(self):
+        self.fleet_table.blockSignals(True)
         self.fleet_table.setRowCount(len(self.usv_fleet))
         for row, (usv_id, data) in enumerate(self.usv_fleet.items()):
             self.fleet_table.setItem(row, 0, QTableWidgetItem(usv_id))
@@ -593,6 +672,87 @@ class MainWindow(QMainWindow):
             self.fleet_table.setItem(row, 2, QTableWidgetItem(f"{data['speed']:.1f} m/s"))
             self.fleet_table.setItem(row, 3, QTableWidgetItem(f"{int(data['battery'])}%"))
             self.fleet_table.setItem(row, 4, QTableWidgetItem(data['status']))
+        self.fleet_table.blockSignals(False)
+
+    def _select_usv(self, usv_id):
+        if usv_id not in self.usv_fleet:
+            return
+        self.selected_usv = usv_id
+        self.radar.selected_usv = usv_id
+        self.radar.update()
+
+        # Sync table row selection
+        self.fleet_table.blockSignals(True)
+        for row in range(self.fleet_table.rowCount()):
+            item = self.fleet_table.item(row, 0)
+            if item and item.text() == usv_id:
+                self.fleet_table.selectRow(row)
+                break
+        self.fleet_table.blockSignals(False)
+
+        self._update_inspector()
+
+    def _on_table_selection_changed(self):
+        selected_rows = self.fleet_table.selectedIndexes()
+        if selected_rows:
+            row = selected_rows[0].row()
+            usv_id_item = self.fleet_table.item(row, 0)
+            if usv_id_item:
+                usv_id = usv_id_item.text()
+                self._select_usv(usv_id)
+
+    def _focus_selected_usv(self):
+        if hasattr(self, 'selected_usv') and self.selected_usv in self.usv_fleet:
+            self.radar.focus_usv(self.selected_usv)
+            self.log_event(f"Map centered on {self.selected_usv}")
+
+    def _hold_selected_usv(self):
+        if hasattr(self, 'selected_usv') and self.selected_usv in self.usv_fleet:
+            self.usv_fleet[self.selected_usv]['status'] = 'HOLD'
+            self.usv_fleet[self.selected_usv]['speed'] = 0.0
+            self.log_event(f"Commanded solo HOLD for {self.selected_usv}")
+            self._update_inspector()
+
+    def _update_inspector(self):
+        if not hasattr(self, 'selected_usv') or self.selected_usv not in self.usv_fleet:
+            return
+
+        usv_id = self.selected_usv
+        data = self.usv_fleet[usv_id]
+
+        self.ins_title.setText(f"{usv_id} Telemetry")
+        self.ins_status_pill.setText(f"● {data['status']}")
+
+        # Status styling
+        st = data['status']
+        if st == 'FORMATION':
+            self.ins_status_pill.setStyleSheet("font-size: 10px; font-weight: 600; padding: 2px 6px; background: #0c4a6e; border: 1px solid #0284c7; border-radius: 4px; color: #38bdf8;")
+        elif st == 'RTH':
+            self.ins_status_pill.setStyleSheet("font-size: 10px; font-weight: 600; padding: 2px 6px; background: #064e3b; border: 1px solid #059669; border-radius: 4px; color: #34d399;")
+        elif st == 'ESTOP':
+            self.ins_status_pill.setStyleSheet("font-size: 10px; font-weight: 600; padding: 2px 6px; background: #450a0a; border: 1px solid #dc2626; border-radius: 4px; color: #f87171;")
+        else:
+            self.ins_status_pill.setStyleSheet("font-size: 10px; font-weight: 600; padding: 2px 6px; background: #18181b; border: 1px solid #27272a; border-radius: 4px; color: #a1a1aa;")
+
+        self.ins_pos.setText(f"X: {data['x']:+.1f}m, Y: {data['y']:+.1f}m")
+
+        hdg_deg = int(math.degrees(data['heading']) % 360)
+        dirs = ["E", "NE", "N", "NW", "W", "SW", "S", "SE", "E"]
+        dir_idx = int((hdg_deg + 22.5) // 45) % 8
+        self.ins_hdg.setText(f"{hdg_deg}° ({dirs[dir_idx]})")
+
+        knots = data['speed'] * 1.94384
+        self.ins_spd.setText(f"{data['speed']:.1f} m/s ({knots:.1f} kts)")
+
+        if usv_id in self.radar.formation_targets:
+            tp = self.radar.formation_targets[usv_id]
+            d = math.hypot(tp['x'] - data['x'], tp['y'] - data['y'])
+            self.ins_slot_dist.setText(f"{d:.1f} m to target")
+        else:
+            self.ins_slot_dist.setText("No target assigned")
+
+        est_voltage = 22.0 + (data['battery'] / 100.0) * 3.2
+        self.ins_bat.setText(f"{int(data['battery'])}% · {est_voltage:.1f}V")
 
     def _on_waypoint_selected(self, wx, wy):
         self.formation_center = {'x': wx, 'y': wy}
@@ -702,6 +862,9 @@ class MainWindow(QMainWindow):
         n = max(1, len(self.usv_fleet))
         self.avg_bat_lbl.setText(f"{int(total_bat / n)}%")
         self.swarm_center_lbl.setText(f"({sum_x / n:.1f}m, {sum_y / n:.1f}m)")
+
+        # Live update for selected vehicle inspector
+        self._update_inspector()
 
     def log_event(self, message):
         timestamp = time.strftime("%H:%M:%S")
