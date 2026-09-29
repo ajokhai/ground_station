@@ -12,7 +12,10 @@ A ROS 2 Humble ground station package for managing, coordinating, and monitoring
   - Dynamic scale bar (Meters and Nautical Miles) and cursor GPS readout
 - **Georeferencing & Environmental Map Layers**:
   - WGS84 $\leftrightarrow$ local ENU projection engine with configurable Datum anchor
+  - **15 Global Sea Ports & Coastal Operations Presets**: Pre-configured operational areas (San Francisco Bay, Port of Rotterdam, Port of Singapore, Sydney Harbour, Portsmouth Naval Base, Strait of Gibraltar, Panama Canal, etc.)
+  - **Interactive Datum Dialog (`Ctrl+Shift+D`)**: Searchable dialog with category filters (`⚓ Sea Ports`, `🌊 Open Ocean`) and custom Lat/Lon coordinate re-anchoring
   - Tile switcher: **Grid**, **Tactical**, **Satellite** (ESRI World Imagery), **Nautical Chart** (ESRI Ocean + OpenSeaMap), **Minimal**
+  - Adaptive zoom downscaling engine to prevent tile blanking at high altitudes
   - Asynchronous tile caching engine for offline maritime operations
 - **Figma-Style Floating Canvas Toolbar**:
   - Dark glassmorphic floating tool dock anchored over bottom radar canvas
@@ -95,3 +98,30 @@ To monitor formation commands published by the GUI:
 ```bash
 ros2 topic echo /ground_station/formation_cmd
 ```
+
+---
+
+## Adding a Real USV or External Simulator
+
+Connecting physical USV companion computers (NVIDIA Jetson, Raspberry Pi) or simulators (NVIDIA Isaac Sim, Gazebo, MuJoCo, MATLAB/Simulink) requires zero code modifications:
+
+1. **Network Configuration**: Ensure both the Ground Station and the robot/simulator share the same network subnet and ROS 2 domain:
+   ```bash
+   export ROS_DOMAIN_ID=0  # match your fleet's domain ID
+   ```
+2. **Switch Operation Mode**: In the Ground Station top toolbar, switch the mode dropdown to **`📡 External ROS 2 / Hardware`**.
+3. **Publish Odometry**: On your vehicle or simulator node, publish to standard namespace topics:
+   - `/usv_1/odom` (`nav_msgs/Odometry`)
+   - `/usv_1/battery` (`sensor_msgs/BatteryState`, optional)
+   - `/usv_1/sensors/sonar` (`sensor_msgs/Range`, optional)
+   - `/usv_1/camera/image_raw/compressed` (`sensor_msgs/CompressedImage`, optional)
+4. **Dynamic Auto-Discovery**: The Ground Station automatically registers `/usv_1` within 1.5 seconds, creates a telemetry card in the sidebar, and places its vessel glyph on the tactical radar.
+5. **Teleoperate or Command**:
+   - **Manual Drive**: Click a USV to select it and drive with `W`/`A`/`S`/`D` or Arrow keys (broadcasts `/usv_{id}/cmd_vel` with auto-zero stop on release).
+   - **Autonomous Swarm**: Click **Deploy Swarm** (`Ctrl+D`) to dispatch target slot waypoints over `/usv_{id}/target_pose`.
+
+---
+
+## Built-In Documentation & Shortcuts
+
+Press **`F1`** inside the application to open the comprehensive dark-mode **User Guide & Reference**, featuring full architectural explanations, tactical radar guides, interactive hazard APF tutorials, and keyboard shortcuts.

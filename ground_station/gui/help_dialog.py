@@ -89,6 +89,13 @@ GUIDE_SECTIONS = {
             <li><b>Cursor Coordinate HUD:</b> The bottom-left status bar displays the exact real-time GPS coordinates (Degrees-Minutes-Seconds and Decimal Degrees) and local ENU Cartesian meters under the mouse crosshair.</li>
         </ul>
 
+        <h3>Maritime Operational Areas &amp; GPS Datum:</h3>
+        <ul>
+            <li><b>15 Global Sea Ports &amp; Testbeds:</b> Quickly teleport the operational theater to pre-configured marine hubs (San Francisco Bay, Port of Rotterdam, Port of Singapore, Sydney Harbour, Portsmouth Naval Base, Strait of Gibraltar, Panama Canal, and open-ocean testbeds) via <b>View &rarr; Maritime Operations Area</b> or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd>.</li>
+            <li><b>Interactive GPS Datum Dialog (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd>):</b> Search and filter pre-configured ports or enter custom Latitude, Longitude, and Altitude. Automatically re-anchors the local Cartesian origin (0, 0) and re-projects all vessel coordinates and satellite tiles in real time.</li>
+            <li><b>Adaptive Zoom Downscaling:</b> High-altitude and coastal zoom levels smoothly downsample tiles to prevent map blanking when zooming out beyond native server resolutions.</li>
+        </ul>
+
         <div style="background: #18181b; border: 1px solid #27272a; border-radius: 6px; padding: 10px; margin: 12px 0;">
             <b style="color: #34d399;">💡 Offline Marine Operations:</b> When connected to the internet, viewed satellite and nautical tiles are automatically cached to disk at <code>~/.cache/usv_ground_station/tiles/</code> for disconnected field deployments.
         </div>
@@ -360,6 +367,31 @@ GUIDE_SECTIONS = {
                 <td>Reset view zoom and pan to origin</td>
             </tr>
             <tr>
+                <td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd></td>
+                <td>Global</td>
+                <td>Open <b>Maritime Operations Area &amp; GPS Datum</b> picker dialog</td>
+            </tr>
+            <tr>
+                <td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd></td>
+                <td>Global</td>
+                <td>Open <b>Fleet Analytics &amp; Diagnostic Telemetry</b> dialog</td>
+            </tr>
+            <tr>
+                <td><kbd>Ctrl</kbd>+<kbd>/</kbd></td>
+                <td>Global</td>
+                <td>Open Quick Shortcuts Cheatsheet</td>
+            </tr>
+            <tr>
+                <td><kbd>W</kbd> / <kbd>A</kbd> / <kbd>S</kbd> / <kbd>D</kbd> or <kbd>&uarr;</kbd> / <kbd>&larr;</kbd> / <kbd>&darr;</kbd> / <kbd>&rarr;</kbd></td>
+                <td>Manual Drive</td>
+                <td><b>Direct Teleoperation:</b> Throttle forward/reverse and rudder steering when a USV is selected (publishes <code>/usv_{id}/cmd_vel</code>)</td>
+            </tr>
+            <tr>
+                <td><kbd>Space</kbd></td>
+                <td>Manual Drive</td>
+                <td>Zero-thrust dynamic brake during manual teleoperation</td>
+            </tr>
+            <tr>
                 <td><kbd>F1</kbd></td>
                 <td>Global</td>
                 <td>Open this <b>User Guide &amp; Reference</b> dialog</td>
@@ -465,6 +497,65 @@ GUIDE_SECTIONS = {
             <b style="color: #38bdf8;">Simulator &amp; Hardware Compatibility:</b>
             <p style="margin: 4px 0 0 0;">This topic schema allows seamless connection with NVIDIA Isaac Sim (RTX water &amp; camera sensors), MATLAB / Simulink (Fossen 6-DOF hydrodynamic models), MuJoCo physics, or physical companion computers over CycloneDDS / Zenoh bridges.</p>
         </div>
+        """
+    },
+    "hardware_sim_bridge": {
+        "title": "📡 Real USV & Simulator Integration",
+        "keywords": "hardware real usv external simulator isaac sim gazebo mujoco simulink jetson onboarding bridge discovery cmd_vel odom dds",
+        "html": """
+        <h2>9. Real USV &amp; External Simulator Integration Flow</h2>
+        <p>The USV Ground Station is engineered to bridge smoothly between rapid desktop testing and physical maritime sea trials with zero code modifications.</p>
+
+        <div style="background: #18181b; border: 1px solid #27272a; border-radius: 6px; padding: 12px; margin: 12px 0;">
+            <b style="color: #38bdf8;">Dual Operation Modes:</b>
+            <ul>
+                <li><b>🎮 Standalone Simulation:</b> Built-in 2D kinematic engine and APF steering for zero-hardware desktop testing. USV movements are computed locally.</li>
+                <li><b>📡 External ROS 2 / Hardware:</b> Suspends internal Euler kinematics. Ingests true physical/simulated odometry, battery status, sonar depth, and camera video from external nodes while continuing to transmit formation downlinks and teleop commands at 50 Hz.</li>
+            </ul>
+        </div>
+
+        <h3>Step-by-Step Onboarding Flow:</h3>
+        <ol style="line-height: 1.8;">
+            <li><b>Network &amp; DDS Domain Alignment:</b> Ensure the Ground Station machine and your companion computer (NVIDIA Jetson, Raspberry Pi, or external simulator host) are on the same local subnet, Wi-Fi, mesh radio, or VPN tunnel. Verify that both share the same ROS 2 Domain ID:
+                <pre style="background: #121216; padding: 8px; border-radius: 4px; border: 1px solid #27272a; color: #34d399;">export ROS_DOMAIN_ID=0  # default, or your fleet domain ID</pre>
+            </li>
+            <li><b>Switch Operation Mode:</b> In the main toolbar, switch the mode dropdown from <code>🎮 Standalone Simulation</code> to <code>📡 External ROS 2 / Hardware</code>. A cyan <code>📡 EXTERNAL ROS 2</code> indicator confirms ingestion mode.</li>
+            <li><b>Launch Vehicle Telemetry Publishers:</b> Onboard the physical USV or within Isaac Sim / Gazebo / MuJoCo, launch a node publishing to standard vehicle namespaces:
+                <ul>
+                    <li><code>/usv_1/odom</code> (<code>nav_msgs/msg/Odometry</code>) — Kinematic state (position in ENU meters, velocity, orientation quaternion).</li>
+                    <li><code>/usv_1/battery</code> (<code>sensor_msgs/msg/BatteryState</code>) — State of charge percentage (0.0 to 1.0) and bus voltage.</li>
+                    <li><code>/usv_1/sensors/sonar</code> (<code>sensor_msgs/msg/Range</code>) — Obstacle clearance or water depth soundings.</li>
+                    <li><code>/usv_1/camera/image_raw/compressed</code> (<code>sensor_msgs/msg/CompressedImage</code>) — Real-time JPEG FPV camera stream.</li>
+                </ul>
+            </li>
+            <li><b>Zero-Config Dynamic Auto-Discovery:</b> The Ground Station's background discovery daemon automatically scans the ROS 2 topic graph at 1.5 Hz. As soon as <code>/usv_{id}/odom</code> is detected, the vehicle is automatically registered:
+                <ul>
+                    <li>A live telemetry card is created in the Swarm Fleet sidebar panel.</li>
+                    <li>A vessel glyph appears immediately at its real GPS/ENU coordinates on the tactical radar.</li>
+                    <li>Downlink command publishers (<code>/usv_{id}/target_pose</code>, <code>/usv_{id}/autonomy_mode</code>, <code>/usv_{id}/cmd_vel</code>) are bound automatically.</li>
+                </ul>
+            </li>
+            <li><b>Command &amp; Teleoperation:</b>
+                <ul>
+                    <li><b>Formation Directives:</b> Click <b>Deploy Swarm (<kbd>Ctrl+D</kbd>)</b> to broadcast target slot coordinates to <code>/usv_{id}/target_pose</code>.</li>
+                    <li><b>Manual Keyboard Drive:</b> Select the USV and use <kbd>W</kbd>/<kbd>A</kbd>/<kbd>S</kbd>/<kbd>D</kbd> or Arrow Keys. The Ground Station publishes <code>geometry_msgs/Twist</code> directly to <code>/usv_{id}/cmd_vel</code>. Releasing keys immediately transmits an automatic zero-velocity safety stop.</li>
+                    <li><b>Emergency Stop (<kbd>Ctrl+E</kbd>):</b> Broadcasts a high-priority kill command to <code>/ground_station/emergency_stop</code> and commands zero thrust to all active USVs.</li>
+                </ul>
+            </li>
+        </ol>
+
+        <h3>Verification with ROS 2 CLI:</h3>
+        <p>You can quickly verify that external telemetry is reaching the station by echoing topics from any terminal:</p>
+        <pre style="background: #121216; padding: 8px; border-radius: 4px; border: 1px solid #27272a; color: #a1a1aa;">
+# Check active USV namespaces
+ros2 topic list | grep usv_
+
+# Echo target formation downlinks sent from Ground Station to USV-1
+ros2 topic echo /usv_1/target_pose
+
+# Echo manual teleoperation drive commands
+ros2 topic echo /usv_1/cmd_vel
+        </pre>
         """
     }
 }

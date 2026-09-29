@@ -59,6 +59,9 @@ Enables real-world GPS navigation, geographic datum reference, and multi-layer m
   - [x] Asynchronous tile fetcher & disk cache (`~/.cache/usv_ground_station/tiles/{layer}/{z}/{x}/{y}.png`) for offline field operations.
   - [x] Support for ESRI World Imagery (Satellite) and ESRI World Ocean Base + OpenSeaMap (Nautical Chart).
   - [x] Blit tiles seamlessly underneath vector radar elements with opacity control and tactical graticule overlay.
+  - [x] **15 Global Sea Ports & Coastal Operations Presets (`datum_dialog.py`)**: Instant theater selection for major naval/maritime hubs (San Francisco Bay, Rotterdam, Singapore, Sydney, Portsmouth, Gibraltar, etc.).
+  - [x] **Interactive Maritime Datum Dialog (`Ctrl+Shift+D`)**: Searchable category filters (`⚓ Sea Ports`, `🌊 Open Ocean`) and custom WGS84 coordinates.
+  - [x] **Adaptive Zoom Downscaling**: Real-time tile downsampling preventing map blanking at high altitudes.
 
 ---
 
@@ -106,6 +109,9 @@ Empowers USVs to report local autonomy states, detected hazards, and dynamic pat
     - [x] Real-time metric distance ($m$ / $km$), nautical miles ($NM$), and true compass bearing ($^\circ T$).
   - [x] **Integrated In-App User Guide & Help Center (`help_dialog.py`)**:
     - [x] App Menu **Help** section (`F1`, `Ctrl+/`) with searchable topic guide, keyboard shortcuts matrix, and ROS 2 topic architecture specifications.
+    - [x] Real USV & Simulator Integration section (Section 9: topic contracts, dynamic discovery flow, DDS domain configuration, CLI verification).
+    - [x] Maritime Operational Areas & GPS Datum Dialog documentation (`Ctrl+Shift+D`).
+    - [x] Direct keyboard teleoperation reference (`W`/`A`/`S`/`D`, `Space` brake) and video visibility toggling.
 
 
 
