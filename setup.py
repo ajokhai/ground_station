@@ -23,6 +23,8 @@ setup(
     entry_points={
         'console_scripts': [
             'ground_station_node = ground_station.ground_station_node:main',
+            'usv_agent_node = ground_station.nodes.usv_agent_node:main',
+            'usv_swarm_sim = usv_sdk.cli:main',
         ],
     },
 )

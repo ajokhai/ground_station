@@ -1,0 +1,58 @@
+<mujoco model="autonomous_usv_catamaran">
+  <compiler angle="radian" coordinate="local" meshdir="assets"/>
+  <option integrator="Euler" timestep="0.01" gravity="0 0 -9.81" viscosity="0.12" density="1025.0"/>
+
+  <visual>
+    <headlight ambient="0.4 0.4 0.4" diffuse="0.8 0.8 0.8" specular="0.2 0.2 0.2"/>
+    <rgba fog="0.1 0.15 0.2 1"/>
+  </visual>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.1 0.2 0.35" rgb2="0.05 0.1 0.2" width="512" height="512"/>
+    <texture name="water_tex" type="2d" builtin="flat" rgb1="0.08 0.2 0.32" rgb2="0.04 0.1 0.22" width="256" height="256"/>
+    <material name="water_mat" texture="water_tex" reflectance="0.3" shininess="0.5"/>
+    <material name="hull_mat" rgba="0.12 0.14 0.18 1.0" shininess="0.4"/>
+    <material name="accent_mat" rgba="0.02 0.71 0.98 1.0" shininess="0.8"/>
+  </asset>
+
+  <worldbody>
+    <!-- Ground plane / seabed -->
+    <geom name="ocean_floor" type="plane" size="500 500 1" pos="0 0 -20" rgba="0.05 0.08 0.12 1"/>
+
+    <!-- Water surface representation -->
+    <geom name="water_surface" type="plane" size="500 500 0.1" pos="0 0 0" material="water_mat" conaffinity="0" contype="0"/>
+
+    <!-- Autonomous USV Catamaran Entity -->
+    <body name="usv_hull" pos="0 0 0.1">
+      <freejoint name="root"/>
+
+      <!-- Port Pontoon -->
+      <geom name="pontoon_port" type="capsule" fromto="-1.5 0.6 0 1.5 0.6 0" size="0.22" material="hull_mat" mass="70"/>
+      <!-- Starboard Pontoon -->
+      <geom name="pontoon_stbd" type="capsule" fromto="-1.5 -0.6 0 1.5 -0.6 0" size="0.22" material="hull_mat" mass="70"/>
+
+      <!-- Crossdeck Platform -->
+      <geom name="deck" type="box" size="1.2 0.6 0.08" pos="0 0 0.2" material="hull_mat" mass="35"/>
+
+      <!-- Masthead Tower (Camera & Sensor Mount) -->
+      <geom name="mast" type="cylinder" size="0.04 0.3" pos="0.3 0 0.5" material="accent_mat" mass="5"/>
+      <geom name="sensor_pod" type="sphere" size="0.12" pos="0.3 0 0.8" material="accent_mat" mass="3"/>
+
+      <!-- Front Bow Marker (Cyan Indicator) -->
+      <geom name="bow_glyph" type="box" size="0.2 0.1 0.05" pos="1.4 0 0.2" material="accent_mat" mass="1"/>
+
+      <!-- Masthead Camera Sensor -->
+      <camera name="masthead_cam" pos="0.35 0 0.8" euler="1.57 0 1.57" fovy="65"/>
+
+      <!-- Actuator sites for differential thrusters -->
+      <site name="thruster_port_site" pos="-1.5 0.6 -0.1" size="0.05"/>
+      <site name="thruster_stbd_site" pos="-1.5 -0.6 -0.1" size="0.05"/>
+    </body>
+  </worldbody>
+
+  <actuator>
+    <!-- Differential Twin Electric Thrusters -->
+    <motor name="thruster_port" site="thruster_port_site" gear="1 0 0 0 0 0" ctrlrange="-150 250"/>
+    <motor name="thruster_stbd" site="thruster_stbd_site" gear="1 0 0 0 0 0" ctrlrange="-150 250"/>
+  </actuator>
+</mujoco>

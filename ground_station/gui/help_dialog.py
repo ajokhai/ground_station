@@ -544,6 +544,31 @@ GUIDE_SECTIONS = {
             </li>
         </ol>
 
+        <h3>USV Fleet Python SDK (<code>usv_sdk</code>):</h3>
+        <p>A lightweight Python client is included directly in the repository for zero-boilerplate vehicle onboarding:</p>
+        <pre style="background: #121216; padding: 8px; border-radius: 4px; border: 1px solid #27272a; color: #34d399;">
+from usv_sdk import USVAgent, TargetPose
+
+agent = USVAgent(usv_id="usv_1")
+
+@agent.on_target_pose
+def handle_target(target: TargetPose):
+    print(f"New waypoint: ({target.x:.1f}, {target.y:.1f})")
+
+agent.start_async()
+agent.publish_odom(x=10.0, y=25.0, heading=1.57, speed=2.5)
+        </pre>
+
+        <h3>Instant Swarm Test Harness CLI:</h3>
+        <p>Operators can spawn autonomous mock swarms with a single command for desktop load and formation testing:</p>
+        <pre style="background: #121216; padding: 8px; border-radius: 4px; border: 1px solid #27272a; color: #a1a1aa;">
+# Spawn a 4-vessel autonomous test swarm
+pixi run ros2 run ground_station usv_swarm_sim swarm --count 4 --spacing 20.0
+
+# Run reference autonomous agent with APF avoidance
+pixi run ros2 run ground_station usv_agent_node --ros-args -p usv_id:=usv_1
+        </pre>
+
         <h3>Verification with ROS 2 CLI:</h3>
         <p>You can quickly verify that external telemetry is reaching the station by echoing topics from any terminal:</p>
         <pre style="background: #121216; padding: 8px; border-radius: 4px; border: 1px solid #27272a; color: #a1a1aa;">

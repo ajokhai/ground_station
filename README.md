@@ -122,6 +122,51 @@ Connecting physical USV companion computers (NVIDIA Jetson, Raspberry Pi) or sim
 
 ---
 
+## USV Fleet Python SDK (`usv_sdk`)
+
+The repository includes a standalone, lightweight ROS 2 Python client library (`usv_sdk`) designed for rapid deployment onto physical companion computers or simulator wrappers:
+
+```python
+from usv_sdk import USVAgent, TargetPose
+
+# Instantiate agent for USV namespace
+agent = USVAgent(usv_id="usv_1")
+
+# Register waypoint target handler
+@agent.on_target_pose
+def handle_target(target: TargetPose):
+    print(f"Assigned slot: ({target.x:.1f}, {target.y:.1f})")
+
+agent.start_async()
+agent.publish_odom(x=15.0, y=30.0, heading=1.57, speed=2.8)
+agent.publish_battery(soc_pct=96.0, voltage=25.2)
+```
+
+### Instant Swarm Simulator CLI (`usv_swarm_sim`)
+
+Spin up an autonomous multi-vehicle swarm for load testing directly from the command line:
+
+```bash
+# Spawn a 4-vehicle autonomous swarm with 20m separation
+pixi run ros2 run ground_station usv_swarm_sim swarm --count 4 --spacing 20.0
+
+# Or run single autonomous reference agent with APF avoidance
+pixi run ros2 run ground_station usv_agent_node --ros-args -p usv_id:=usv_1 -p initial_x:=10.0 -p initial_y:=15.0
+```
+
+---
+
+## Reference Simulator Connectors (`sim_bridges/`)
+
+Ready-to-use bridge scripts and hydrodynamic models located in [`sim_bridges/`](sim_bridges/):
+
+- **[NVIDIA Isaac Sim](sim_bridges/isaac_sim/)**: RTX water simulation, ActionGraph ROS 2 bridge, and synthetic camera streaming.
+- **[MATLAB / Simulink](sim_bridges/simulink/)**: Thor I. Fossen 6-DOF nonlinear hydrodynamic ODE model with Coriolis, added mass, and twin thruster dynamics.
+- **[MuJoCo Physics](sim_bridges/mujoco/)**: Rigid-body catamaran MJCF model (`usv_scene.xml`) with hydrodynamic damping and interactive 3D viewer.
+
+---
+
 ## Built-In Documentation & Shortcuts
 
 Press **`F1`** inside the application to open the comprehensive dark-mode **User Guide & Reference**, featuring full architectural explanations, tactical radar guides, interactive hazard APF tutorials, and keyboard shortcuts.
+
