@@ -16,11 +16,10 @@ if sys.platform == 'darwin':
     if os.path.isdir(_plugins_dir):
         if 'QT_PLUGIN_PATH' not in os.environ:
             os.environ['QT_PLUGIN_PATH'] = _plugins_dir
-        # Ensure macOS file flags do not hide platform plugins from Qt
-        _platforms_dir = os.path.join(_plugins_dir, 'platforms')
-        if os.path.isdir(_platforms_dir):
-            for _f in os.listdir(_platforms_dir):
-                _fp = os.path.join(_platforms_dir, _f)
+        # Ensure macOS BSD file flags do not hide any Qt plugins (platforms, imageformats, etc.)
+        for _root, _dirs, _files in os.walk(_plugins_dir):
+            for _f in _files:
+                _fp = os.path.join(_root, _f)
                 try:
                     if os.stat(_fp).st_flags != 0:
                         os.chflags(_fp, 0)

@@ -865,7 +865,9 @@ class RadarWidget(QWidget):
 
         # Datum pill label
         p.setFont(QFont("SF Pro Text", 8, QFont.Medium))
-        txt = f"⚓ DATUM ({self.georef.datum_lat:.4f}°N, {abs(self.georef.datum_lon):.4f}°W)"
+        ns = "N" if self.georef.datum_lat >= 0 else "S"
+        ew = "E" if self.georef.datum_lon >= 0 else "W"
+        txt = f"⚓ DATUM ({abs(self.georef.datum_lat):.4f}°{ns}, {abs(self.georef.datum_lon):.4f}°{ew})"
         fm = p.fontMetrics()
         tw = fm.horizontalAdvance(txt) + 8
         rect = QRectF(sp.x() + 10, sp.y() + 4, tw, 14)
