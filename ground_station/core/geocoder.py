@@ -48,10 +48,16 @@ OFFLINE_MARITIME_DATABASE: List[Dict[str, Any]] = [
     {"name": "Bosporus Strait (Istanbul)", "region": "Turkey", "lat": 41.1172, "lon": 29.0711, "type": "strait"},
 
     # Middle East & Africa
+    {"name": "Port of Lagos (Apapa & Tin Can Island)", "region": "Lagos, Nigeria", "lat": 6.4400, "lon": 3.3650, "type": "port"},
+    {"name": "Port of Onne (Port Harcourt)", "region": "Rivers State, Nigeria", "lat": 4.7130, "lon": 7.1550, "type": "port"},
     {"name": "Suez Canal (Port Said Entrance)", "region": "Egypt", "lat": 31.2653, "lon": 32.3019, "type": "canal"},
+    {"name": "Port of Alexandria", "region": "Egypt", "lat": 31.1833, "lon": 29.8667, "type": "port"},
     {"name": "Port of Jebel Ali (Dubai)", "region": "United Arab Emirates", "lat": 25.0113, "lon": 55.0617, "type": "port"},
     {"name": "Strait of Hormuz", "region": "Oman / Iran", "lat": 26.5667, "lon": 56.2500, "type": "strait"},
     {"name": "Bab-el-Mandeb Strait", "region": "Yemen / Djibouti", "lat": 12.5833, "lon": 43.3333, "type": "strait"},
+    {"name": "Port of Mombasa (Kilindini Harbour)", "region": "Kenya", "lat": -4.0667, "lon": 39.6667, "type": "port"},
+    {"name": "Port of Dakar", "region": "Senegal", "lat": 14.6760, "lon": -17.4260, "type": "port"},
+    {"name": "Port of Abidjan", "region": "Côte d'Ivoire", "lat": 5.2750, "lon": -4.0150, "type": "port"},
     {"name": "Port of Cape Town", "region": "South Africa", "lat": -33.9189, "lon": 18.4233, "type": "port"},
     {"name": "Port of Durban", "region": "South Africa", "lat": -29.8587, "lon": 31.0218, "type": "port"},
 

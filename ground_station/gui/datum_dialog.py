@@ -106,6 +106,24 @@ MARITIME_PRESETS = [
         "lon": 55.0600,
         "desc": "Deep-water port in the Arabian Gulf, critical international shipping crossroads."
     },
+    {
+        "name": "Port of Lagos (Apapa & Tin Can Island)",
+        "region": "Lagos, Nigeria (Gulf of Guinea)",
+        "category": "Sea Port",
+        "icon": "⚓",
+        "lat": 6.4400,
+        "lon": 3.3650,
+        "desc": "Nigeria's primary commercial seaport complex connecting Lagos Harbour to the Atlantic."
+    },
+    {
+        "name": "Port of Onne (Port Harcourt)",
+        "region": "Rivers State, Nigeria (Niger Delta)",
+        "category": "Sea Port",
+        "icon": "⚓",
+        "lat": 4.7130,
+        "lon": 7.1550,
+        "desc": "Major deep-water oil & gas cargo port hub on the Bonny River channel."
+    },
     # ── Oceanic & Autonomous Marine Proving Grounds ──
     {
         "name": "Golden Gate & Pacific Ocean Approach",
