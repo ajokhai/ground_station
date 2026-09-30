@@ -3,13 +3,130 @@ Header Toolbar for USV Ground Station.
 Provides quick-access mission controls, view style selector, and e-stop.
 """
 
-from PyQt5.QtCore import Qt, QSize, pyqtSignal
+from PyQt5.QtCore import Qt, QSize, pyqtSignal, QTimer, QPoint
 from PyQt5.QtGui import QColor
-from PyQt5.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QComboBox, QListView
+from PyQt5.QtWidgets import (
+    QFrame, QHBoxLayout, QLabel, QPushButton, QComboBox, QListView,
+    QLineEdit, QMenu
+)
 from ground_station.gui.icons import (
     make_play_icon, make_pause_icon, make_rth_icon,
     make_estop_icon, make_sidebar_icon, make_camera_icon
 )
+from ground_station.core.geocoder import PlaceGeocoder
+
+
+class PlaceSearchBar(QLineEdit):
+    place_selected = pyqtSignal(dict)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setPlaceholderText("🔍 Search port, coords, or city... (Ctrl+F)")
+        self.setFixedWidth(240)
+        self.setFixedHeight(26)
+        self.setStyleSheet("""
+            QLineEdit {
+                font-size: 11px;
+                padding: 2px 8px;
+                background: #141416;
+                border: 1px solid #27272a;
+                border-radius: 5px;
+                color: #fafafa;
+            }
+            QLineEdit:hover {
+                border-color: #3f3f46;
+            }
+            QLineEdit:focus {
+                border-color: #38bdf8;
+                background: #18181b;
+            }
+        """)
+
+        self.geocoder = PlaceGeocoder(self)
+        self.geocoder.results_ready.connect(self._on_results)
+
+        self._debounce_timer = QTimer(self)
+        self._debounce_timer.setSingleShot(True)
+        self._debounce_timer.setInterval(220)
+        self._debounce_timer.timeout.connect(self._trigger_search)
+
+        self.textChanged.connect(self._on_text_changed)
+        self.returnPressed.connect(self._on_return_pressed)
+
+        self._menu = QMenu(self)
+        self._menu.setStyleSheet("""
+            QMenu {
+                background: #18181b;
+                border: 1px solid #27272a;
+                border-radius: 6px;
+                padding: 4px;
+                color: #fafafa;
+                font-size: 11px;
+            }
+            QMenu::item {
+                padding: 6px 14px;
+                border-radius: 4px;
+            }
+            QMenu::item:selected {
+                background: #27272a;
+                color: #38bdf8;
+            }
+        """)
+        self._latest_results = []
+
+    def _on_text_changed(self, text: str):
+        if len(text.strip()) >= 2:
+            self._debounce_timer.start()
+        else:
+            self._menu.hide()
+
+    def _trigger_search(self):
+        txt = self.text().strip()
+        if txt:
+            self.geocoder.search(txt)
+
+    def _on_return_pressed(self):
+        txt = self.text().strip()
+        if not txt:
+            return
+        coord = PlaceGeocoder.parse_coordinates(txt)
+        if coord:
+            lat, lon = coord
+            self.place_selected.emit({
+                "name": f"Coordinate ({lat:.4f}°, {lon:.4f}°)",
+                "lat": lat,
+                "lon": lon,
+                "type": "coordinate"
+            })
+            self._menu.hide()
+            self.clearFocus()
+        elif self._latest_results:
+            self._select_place(self._latest_results[0])
+
+    def _on_results(self, results: list):
+        self._latest_results = results
+        if not self.hasFocus() or not results:
+            self._menu.hide()
+            return
+
+        self._menu.clear()
+        for r in results[:6]:
+            icon = "⚓" if r.get("type") == "port" else ("🏛️" if r.get("type") == "naval_base" else ("🌊" if r.get("type") in ("canal", "strait") else "📍"))
+            region_str = f" ({r['region']})" if r.get("region") else ""
+            title = f"{icon}  {r['name']}{region_str}  [{r['lat']:.3f}°, {r['lon']:.3f}°]"
+            act = self._menu.addAction(title)
+            act.triggered.connect(lambda checked, item=r: self._select_place(item))
+
+        p = self.mapToGlobal(QPoint(0, self.height() + 2))
+        self._menu.popup(p)
+
+    def _select_place(self, item: dict):
+        self.blockSignals(True)
+        self.setText(item['name'])
+        self.blockSignals(False)
+        self._menu.hide()
+        self.clearFocus()
+        self.place_selected.emit(item)
 
 
 class HeaderToolbar(QFrame):
@@ -21,6 +138,7 @@ class HeaderToolbar(QFrame):
     emergency_stop_clicked = pyqtSignal()
     sidebar_toggle_clicked = pyqtSignal(bool)
     video_toggle_clicked = pyqtSignal(bool)
+    place_selected = pyqtSignal(dict)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -129,6 +247,12 @@ class HeaderToolbar(QFrame):
         self.tb_video.setChecked(False)
         self.tb_video.clicked.connect(self.video_toggle_clicked.emit)
         layout.addWidget(self.tb_video)
+        layout.addStretch()
+
+        # ── Global Place Search Bar ──
+        self.search_bar = PlaceSearchBar(self)
+        self.search_bar.place_selected.connect(self.place_selected.emit)
+        layout.addWidget(self.search_bar)
 
         layout.addStretch()
 

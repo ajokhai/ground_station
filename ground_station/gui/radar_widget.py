@@ -697,7 +697,7 @@ class RadarWidget(QWidget):
     def wheelEvent(self, event):
         f = 1.15 if event.angleDelta().y() > 0 else 1.0 / 1.15
         ns = self.scale * f
-        if 2.0 <= ns <= 50.0:
+        if 0.000008 <= ns <= 50.0:
             self.scale = ns
             self.update()
 
@@ -789,13 +789,37 @@ class RadarWidget(QWidget):
 
         p.restore()
 
+    def _compute_grid_step(self) -> float:
+        """Calculate optimal world-meter step so grid lines are separated by 60-140 screen pixels."""
+        target_m = 90.0 / max(1e-9, self.scale)
+        exponent = math.floor(math.log10(target_m))
+        fraction = target_m / (10 ** exponent)
+        if fraction < 1.5:
+            base = 1.0
+        elif fraction < 3.5:
+            base = 2.0
+        elif fraction < 7.5:
+            base = 5.0
+        else:
+            base = 10.0
+        return max(1.0, base * (10 ** exponent))
+
+    def _format_distance(self, meters: float) -> str:
+        """Format distance into compact string (m, km, or M)."""
+        sign = "+" if meters > 0 else ("-" if meters < 0 else "")
+        abs_m = abs(meters)
+        if abs_m >= 1_000_000:
+            val = abs_m / 1_000_000
+            return f"{sign}{val:.0f}M" if val.is_integer() else f"{sign}{val:.1f}M"
+        elif abs_m >= 1000:
+            val = abs_m / 1000
+            return f"{sign}{val:.0f}k" if val.is_integer() else f"{sign}{val:.1f}k"
+        else:
+            return f"{sign}{abs_m:.0f}"
+
     def _draw_grid_overlay(self, p, cx, cy, w, h):
         """Draw faint tactical distance graticules over map imagery."""
-        step = 10.0
-        if self.scale < 5:
-            step = 25.0
-        elif self.scale > 20:
-            step = 5.0
+        step = self._compute_grid_step()
         gpx = step * self.scale
 
         p.save()
@@ -808,7 +832,7 @@ class RadarWidget(QWidget):
             p.drawLine(int(x), 0, int(x), h)
             if not on_axis and 40 < x < w - 40:
                 p.setPen(QColor(161, 161, 170, 160))
-                p.drawText(int(x + 3), h - 8, f"{(x - cx) / self.scale:+.0f}")
+                p.drawText(int(x + 3), h - 8, self._format_distance((x - cx) / self.scale))
             x += gpx
 
         y = cy % gpx
@@ -818,7 +842,7 @@ class RadarWidget(QWidget):
             p.drawLine(0, int(y), w, int(y))
             if not on_axis and 24 < y < h - 24:
                 p.setPen(QColor(161, 161, 170, 160))
-                p.drawText(6, int(y - 4), f"{-(y - cy) / self.scale:+.0f}")
+                p.drawText(6, int(y - 4), self._format_distance(-(y - cy) / self.scale))
             y += gpx
 
         p.restore()
@@ -997,8 +1021,12 @@ class RadarWidget(QWidget):
         p.save()
         p.setRenderHint(QPainter.Antialiasing)
 
-        target_m = 100.0 / self.scale
-        steps = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000]
+        target_m = 120.0 / max(1e-9, self.scale)
+        steps = [
+            1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000,
+            10_000, 20_000, 50_000, 100_000, 200_000, 500_000,
+            1_000_000, 2_000_000, 5_000_000, 10_000_000
+        ]
         chosen_m = steps[0]
         for s in steps:
             if s <= target_m:
@@ -1020,8 +1048,20 @@ class RadarWidget(QWidget):
 
         # Scale text
         p.setFont(QFont("Menlo", 8, QFont.Bold))
-        metric_str = f"{chosen_m:.0f}m" if chosen_m >= 1 else f"{chosen_m:.1f}m"
-        if nm >= 0.05:
+        if chosen_m >= 1_000_000:
+            metric_str = f"{chosen_m / 1_000_000:.0f}M m"
+        elif chosen_m >= 1000:
+            metric_str = f"{chosen_m / 1000:.0f} km"
+        elif chosen_m >= 1:
+            metric_str = f"{chosen_m:.0f} m"
+        else:
+            metric_str = f"{chosen_m:.1f} m"
+
+        if nm >= 100:
+            scale_text = f"{metric_str} · {nm:.0f} NM"
+        elif nm >= 1:
+            scale_text = f"{metric_str} · {nm:.1f} NM"
+        elif nm >= 0.05:
             scale_text = f"{metric_str} · {nm:.2f} NM"
         else:
             scale_text = f"{metric_str} · {chosen_m * 3.28084:.0f} ft"
@@ -1032,11 +1072,7 @@ class RadarWidget(QWidget):
 
     def _draw_grid(self, p, cx, cy, w, h):
         """Standard metric grid with coordinate labels."""
-        step = 10.0
-        if self.scale < 5:
-            step = 25.0
-        elif self.scale > 20:
-            step = 5.0
+        step = self._compute_grid_step()
         gpx = step * self.scale
 
         p.setFont(QFont("Menlo", 7))
@@ -1048,7 +1084,7 @@ class RadarWidget(QWidget):
             p.drawLine(int(x), 0, int(x), h)
             if not on_axis and 40 < x < w - 40:
                 p.setPen(self.c_muted)
-                p.drawText(int(x + 3), h - 8, f"{(x - cx) / self.scale:+.0f}")
+                p.drawText(int(x + 3), h - 8, self._format_distance((x - cx) / self.scale))
             x += gpx
 
         y = cy % gpx
@@ -1058,7 +1094,7 @@ class RadarWidget(QWidget):
             p.drawLine(0, int(y), w, int(y))
             if not on_axis and 24 < y < h - 24:
                 p.setPen(self.c_muted)
-                p.drawText(6, int(y - 4), f"{-(y - cy) / self.scale:+.0f}")
+                p.drawText(6, int(y - 4), self._format_distance(-(y - cy) / self.scale))
             y += gpx
 
         # Origin cross
@@ -1072,8 +1108,10 @@ class RadarWidget(QWidget):
         label_font = QFont("Menlo", 7)
         p.setFont(label_font)
 
+        step = self._compute_grid_step()
         # Range rings from origin
-        for r_m in [10, 25, 50, 100, 200]:
+        for multiplier in [1, 2, 5, 10]:
+            r_m = step * multiplier
             r_px = r_m * self.scale
             if r_px < 20 or r_px > max(w, h) * 1.5:
                 continue
@@ -1082,7 +1120,7 @@ class RadarWidget(QWidget):
             p.drawEllipse(QPointF(cx, cy), r_px, r_px)
             # Range label
             p.setPen(self.c_muted)
-            p.drawText(int(cx + r_px + 3), int(cy - 3), f"{r_m}m")
+            p.drawText(int(cx + r_px + 3), int(cy - 3), self._format_distance(r_m))
 
         # Compass axis lines through origin
         p.setPen(QPen(self.c_axis, 1))

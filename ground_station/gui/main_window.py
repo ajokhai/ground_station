@@ -28,6 +28,7 @@ from ground_station.gui.video_widget import VideoFeedWidget
 from ground_station.gui.help_dialog import HelpGuideDialog
 from ground_station.gui.datum_dialog import MaritimeDatumDialog, MARITIME_PRESETS
 from ground_station.core.georeference import point_in_polygon, dist_to_segment
+from ground_station.core.weather_service import WeatherService
 
 
 class MainWindow(QMainWindow):
@@ -150,6 +151,11 @@ class MainWindow(QMainWindow):
 
         # Hazard obstacles list (clean by default; populated via user placement or ROS 2)
         self.radar.set_obstacles([])
+
+        # Real-Time Metocean & Live Weather Integration Service
+        self.weather_service = WeatherService(self)
+        self.weather_service.weather_updated.connect(self._on_live_weather_updated)
+        self.weather_service.update_location(self.radar.georef.datum_lat, self.radar.georef.datum_lon, "San Francisco Bay")
 
         # 30 Hz animation/telemetry tick
         self.anim_timer = QTimer(self)
@@ -290,13 +296,26 @@ class MainWindow(QMainWindow):
 
         zoom_in_act = QAction("Zoom In", self)
         zoom_in_act.setShortcut(QKeySequence("Ctrl+="))
-        zoom_in_act.triggered.connect(lambda: setattr(self.radar, 'scale', min(50.0, self.radar.scale * 1.25)))
+        def _do_zoom_in():
+            self.radar.scale = min(50.0, self.radar.scale * 1.25)
+            self.radar.update()
+        zoom_in_act.triggered.connect(_do_zoom_in)
         view_menu.addAction(zoom_in_act)
 
         zoom_out_act = QAction("Zoom Out", self)
         zoom_out_act.setShortcut(QKeySequence("Ctrl+-"))
-        zoom_out_act.triggered.connect(lambda: setattr(self.radar, 'scale', max(2.0, self.radar.scale * 0.8)))
+        def _do_zoom_out():
+            self.radar.scale = max(0.000008, self.radar.scale * 0.8)
+            self.radar.update()
+        zoom_out_act.triggered.connect(_do_zoom_out)
         view_menu.addAction(zoom_out_act)
+
+        view_menu.addSeparator()
+
+        find_place_act = QAction("Search Places & Coordinates...", self)
+        find_place_act.setShortcut(QKeySequence("Ctrl+F"))
+        find_place_act.triggered.connect(lambda: self.toolbar.search_bar.setFocus())
+        view_menu.addAction(find_place_act)
 
         # Help
         help_menu = mb.addMenu("Help")
@@ -340,6 +359,7 @@ class MainWindow(QMainWindow):
         self.toolbar.emergency_stop_clicked.connect(self._emergency_stop)
         self.toolbar.sidebar_toggle_clicked.connect(self._toggle_sidebar)
         self.toolbar.video_toggle_clicked.connect(self._toggle_video_feed)
+        self.toolbar.place_selected.connect(self._on_place_selected)
         root.addWidget(self.toolbar)
 
         # ── Manual Drive HUD Banner (shown when driving) ──
@@ -698,6 +718,28 @@ class MainWindow(QMainWindow):
             self.weather_report['lat_str'] = f"{abs(lat):.2f}°{'N' if lat >= 0 else 'S'}"
             self.weather_report['lon_str'] = f"{abs(lon):.2f}°{'E' if lon >= 0 else 'W'}"
             self.weather_report['station'] = f"Operational Zone ({name})"
+        if hasattr(self, 'weather_service'):
+            self.weather_service.update_location(lat, lon, name)
+
+    def _on_place_selected(self, place: dict):
+        lat = place.get('lat', 37.8200)
+        lon = place.get('lon', -122.4200)
+        name = place.get('name', 'Selected Location')
+        self._set_maritime_operational_area(name, lat, lon)
+        self.statusBar().showMessage(f"⚓ Re-anchored Datum to {name} ({lat:.4f}°, {lon:.4f}°)", 5000)
+
+    def _on_live_weather_updated(self, data: dict):
+        self.weather_report.update(data)
+        self.env_data = self.weather_report
+
+        drone_mets = {uid: d.get('met_data', {}) for uid, d in self.usv_fleet.items()}
+        self.sidebar.update_metocean_data(self.weather_report, drone_mets)
+
+        active_drone_met = self.usv_fleet.get(self.selected_usv, {}).get('met_data') if self.selected_usv else self.usv_fleet['USV-1'].get('met_data')
+        self.radar.set_metocean_data(self.weather_report, active_drone_met)
+
+        tag = "🟢 Live Weather (Open-Meteo)" if data.get('is_live') else "📡 Baseline Climatology"
+        self.log_event(f"{tag}: {data.get('station', '')} — Wind {data.get('wind_spd', 0)} kn @ {data.get('wind_dir', 0):.0f}°")
 
     def _open_custom_datum_dialog(self):
         current_lat = self.radar.georef.datum_lat
@@ -1291,5 +1333,7 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         if hasattr(self, 'anim_timer') and self.anim_timer.isActive():
             self.anim_timer.stop()
+        if hasattr(self, 'weather_service') and hasattr(self.weather_service, '_refresh_timer'):
+            self.weather_service._refresh_timer.stop()
         super().closeEvent(event)
 

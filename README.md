@@ -12,6 +12,9 @@ A ROS 2 Humble ground station package for managing, coordinating, and monitoring
   - Dynamic scale bar (Meters and Nautical Miles) and cursor GPS readout
 - **Georeferencing & Environmental Map Layers**:
   - WGS84 $\leftrightarrow$ local ENU projection engine with configurable Datum anchor
+  - **Planetary Multi-Scale Zoom (Zoom 1 - 19)**: Unrestricted zoom architecture scaling smoothly from tactical berth level (50 px/m) out to full globe overview (Zoom 1, scale $0.000008\text{ px/m}$) with adaptive graticule spacing and kilometer / nautical mile readouts.
+  - **Global Place Search & Natural Language Geocoding (`Ctrl+F`)**: Integrated toolbar search bar powered by OpenStreetMap Nominatim and an offline strategic port database (50+ maritime choke points). Instantly parses raw GPS coordinates or natural language place names to re-anchor datum and recenter the canvas.
+  - **Real-Time Live Metocean & Weather Ingestion**: Automated background service querying Open-Meteo Forecast & Marine APIs (zero API-key requirement) to deliver live surface wind (speed, direction, gusts), wave height, wave period, barometric pressure, and temperature for the active operational theater.
   - **15 Global Sea Ports & Coastal Operations Presets**: Pre-configured operational areas (San Francisco Bay, Port of Rotterdam, Port of Singapore, Sydney Harbour, Portsmouth Naval Base, Strait of Gibraltar, Panama Canal, etc.)
   - **Interactive Datum Dialog (`Ctrl+Shift+D`)**: Searchable dialog with category filters (`⚓ Sea Ports`, `🌊 Open Ocean`) and custom Lat/Lon coordinate re-anchoring
   - Tile switcher: **Grid**, **Tactical**, **Satellite** (ESRI World Imagery), **Nautical Chart** (ESRI Ocean + OpenSeaMap), **Minimal**

@@ -867,8 +867,16 @@ class SidebarWidget(QFrame):
 
         has_discrepancy = abs(d_spd) >= 2.0 or abs(d_dir) >= 10.0 or abs(d_cur) >= 0.3
 
+        station_name = rep.get('station', 'NOAA #46026')
+        is_live = rep.get('is_live', False)
+        live_icon = "🟢" if is_live else "📡"
+
         if "Compare" in mode:
-            self.met_source_info.setText(f"NOAA #46026 vs {uid}")
+            self.met_source_info.setText(f"{live_icon} {station_name} vs {uid}")
+            self.met_source_info.setStyleSheet(
+                "color: #34d399; font-size: 9px; font-weight: 600; font-family: Menlo, monospace;"
+                if is_live else "color: #71717a; font-size: 9px; font-family: Menlo, monospace;"
+            )
             self.met_discrepancy_banner.setVisible(True)
             if has_discrepancy:
                 self.met_discrepancy_banner.setText(f"⚠️ Discrepancy: Wind {d_spd:+.1f}kn ({d_dir:+d}°) · Drift {d_cur:+.1f}kn")
@@ -909,9 +917,13 @@ class SidebarWidget(QFrame):
             self.env_baro.setStyleSheet(f"color: {baro_col}; font-weight: 600; font-family: Menlo, monospace; font-size: 10px;")
 
         elif "Weather" in mode:
-            self.met_source_info.setText("NOAA Buoy #46026")
+            self.met_source_info.setText(f"{live_icon} {station_name}")
+            self.met_source_info.setStyleSheet(
+                "color: #34d399; font-size: 9px; font-weight: 600; font-family: Menlo, monospace;"
+                if is_live else "color: #71717a; font-size: 9px; font-family: Menlo, monospace;"
+            )
             self.met_discrepancy_banner.setVisible(True)
-            self.met_discrepancy_banner.setText("🌐 Regional Met Forecast (NOAA Station #46026)")
+            self.met_discrepancy_banner.setText(f"{live_icon} {station_name} ({'Real-Time Open-Meteo' if is_live else 'Metocean Baseline'})")
             self.met_discrepancy_banner.setStyleSheet("""
                 background: #082f49; border: 1px solid #0369a1;
                 border-radius: 4px; color: #38bdf8; font-size: 9px; font-weight: 600; padding: 3px 6px;

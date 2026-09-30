@@ -49,10 +49,14 @@ class TileManager(QObject):
     @staticmethod
     def latlon_to_tile(lat: float, lon: float, zoom: int) -> Tuple[int, int]:
         """Convert Latitude/Longitude to Slippy Map tile X, Y indices at zoom level."""
-        lat_rad = math.radians(lat)
+        lat_clamped = max(-85.05112878, min(85.05112878, lat))
+        lon_clamped = max(-180.0, min(180.0, lon))
+        lat_rad = math.radians(lat_clamped)
         n = 2.0 ** zoom
-        xtile = int((lon + 180.0) / 360.0 * n)
+        xtile = int((lon_clamped + 180.0) / 360.0 * n)
         ytile = int((1.0 - math.asinh(math.tan(lat_rad)) / math.pi) / 2.0 * n)
+        xtile = max(0, min(int(n) - 1, xtile))
+        ytile = max(0, min(int(n) - 1, ytile))
         return xtile, ytile
 
     @staticmethod
@@ -66,11 +70,11 @@ class TileManager(QObject):
 
     @staticmethod
     def zoom_from_scale(scale_px_per_meter: float, datum_lat: float = 37.8200) -> int:
-        """Calculate optimal slippy map zoom level (3 - 19) from radar canvas scale."""
+        """Calculate optimal slippy map zoom level (1 - 19) from radar canvas scale."""
         cos_lat = max(0.01, math.cos(math.radians(datum_lat)))
-        meters_per_pixel = 1.0 / max(0.0001, scale_px_per_meter)
+        meters_per_pixel = 1.0 / max(1e-9, scale_px_per_meter)
         target_zoom = math.log2((156543.03392 * cos_lat) / meters_per_pixel)
-        return max(3, min(19, int(round(target_zoom))))
+        return max(1, min(19, int(round(target_zoom))))
 
     # ─── Tile Caching & Retrieval ─────────────────────────────────────────────
 
@@ -170,17 +174,18 @@ class TileManager(QObject):
         ll_top_right = georef.to_latlon(max_wx, max_wy)
 
         # Adaptively step down zoom level until tile count is manageable (<= 42 tiles)
-        while zoom >= 3:
+        while zoom >= 1:
             x_min, y_min = self.latlon_to_tile(ll_top_right.lat, ll_bottom_left.lon, zoom)
             x_max, y_max = self.latlon_to_tile(ll_bottom_left.lat, ll_top_right.lon, zoom)
 
-            x_start = min(x_min, x_max)
-            x_end = max(x_min, x_max)
-            y_start = min(y_min, y_max)
-            y_end = max(y_min, y_max)
+            max_idx = (1 << zoom) - 1
+            x_start = max(0, min(x_min, x_max))
+            x_end = min(max_idx, max(x_min, x_max))
+            y_start = max(0, min(y_min, y_max))
+            y_end = min(max_idx, max(y_min, y_max))
 
             tile_count = (x_end - x_start + 1) * (y_end - y_start + 1)
-            if tile_count <= 42 or zoom == 3:
+            if tile_count <= 42 or zoom == 1:
                 break
             zoom -= 1
 

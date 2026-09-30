@@ -114,38 +114,52 @@ class GeoReference:
 
         return LatLon(math.degrees(phi), math.degrees(lam), alt)
 
+    # Earth Radius for Web Mercator (EPSG:3857)
+    R_MERC = 6378137.0
+
+    @classmethod
+    def latlon_to_merc(cls, lat: float, lon: float) -> Tuple[float, float]:
+        """Convert WGS84 Geodetic (lat, lon) in degrees to Web Mercator meters."""
+        x = math.radians(lon) * cls.R_MERC
+        lat_clamped = max(-85.05112878, min(85.05112878, lat))
+        phi = math.radians(lat_clamped)
+        y = cls.R_MERC * math.log(math.tan(math.pi / 4.0 + phi / 2.0))
+        return x, y
+
+    @classmethod
+    def merc_to_latlon(cls, x: float, y: float) -> Tuple[float, float]:
+        """Convert Web Mercator meters back to WGS84 Geodetic (lat, lon) in degrees."""
+        lon = math.degrees(x / cls.R_MERC)
+        phi = 2.0 * math.atan(math.exp(y / cls.R_MERC)) - math.pi / 2.0
+        lat = math.degrees(phi)
+        return lat, lon
+
     def to_enu(self, lat: float, lon: float, alt: float = 0.0) -> ENUCoordinate:
         """
         Convert a WGS84 GPS coordinate (lat, lon, alt) to local East-North-Up (ENU)
         Cartesian meters relative to this engine's datum.
+        Uses conformal Web Mercator projection scaled to local datum latitude,
+        providing seamless sub-meter tactical precision locally and infinite
+        planetary coverage globally without tangent plane divergence.
         """
-        gx, gy, gz = self.geodetic_to_ecef(lat, lon, alt)
-        dx = gx - self._ref_ecef[0]
-        dy = gy - self._ref_ecef[1]
-        dz = gz - self._ref_ecef[2]
-
-        # Rotate ECEF delta to ENU frame
-        east = -self._sin_lam * dx + self._cos_lam * dy
-        north = -self._sin_phi * self._cos_lam * dx - self._sin_phi * self._sin_lam * dy + self._cos_phi * dz
-        up = self._cos_phi * self._cos_lam * dx + self._cos_phi * self._sin_lam * dy + self._sin_phi * dz
-
-        return ENUCoordinate(east, north, up)
+        d_mx, d_my = self.latlon_to_merc(self.datum_lat, self.datum_lon)
+        mx, my = self.latlon_to_merc(lat, lon)
+        east = (mx - d_mx) * self._cos_phi
+        north = (my - d_my) * self._cos_phi
+        return ENUCoordinate(east, north, alt)
 
     def to_latlon(self, east: float, north: float, up: float = 0.0) -> LatLon:
         """
         Convert local East-North-Up (ENU) Cartesian meters (X=East, Y=North, Z=Up)
         back to WGS84 GPS (lat, lon, alt).
         """
-        # Transform ENU vector back to ECEF delta
-        dx = -self._sin_lam * east - self._sin_phi * self._cos_lam * north + self._cos_phi * self._cos_lam * up
-        dy = self._cos_lam * east - self._sin_phi * self._sin_lam * north + self._cos_phi * self._sin_lam * up
-        dz = self._cos_phi * north + self._sin_phi * up
-
-        gx = self._ref_ecef[0] + dx
-        gy = self._ref_ecef[1] + dy
-        gz = self._ref_ecef[2] + dz
-
-        return self.ecef_to_geodetic(gx, gy, gz)
+        d_mx, d_my = self.latlon_to_merc(self.datum_lat, self.datum_lon)
+        mx = d_mx + east / self._cos_phi
+        my = d_my + north / self._cos_phi
+        lat, lon = self.merc_to_latlon(mx, my)
+        # Normalize longitude to [-180, 180]
+        lon = (lon + 180.0) % 360.0 - 180.0
+        return LatLon(lat, lon, up)
 
     # ── Formatting & Maritime Navigation Helpers ──
 
