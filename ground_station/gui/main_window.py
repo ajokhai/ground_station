@@ -1287,3 +1287,9 @@ class MainWindow(QMainWindow):
         ts = time.strftime("%H:%M:%S")
         self.log_console.append(f"<span style='color:#3f3f46;'>[{ts}]</span> {message}")
         self.log_console.verticalScrollBar().setValue(self.log_console.verticalScrollBar().maximum())
+
+    def closeEvent(self, event):
+        if hasattr(self, 'anim_timer') and self.anim_timer.isActive():
+            self.anim_timer.stop()
+        super().closeEvent(event)
+

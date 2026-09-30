@@ -134,16 +134,28 @@ class GroundStationNode(Node):
         self.heartbeat_pub.publish(msg)
 
     def publish_formation_command(self, cmd_dict):
-        msg = String()
-        msg.data = json.dumps(cmd_dict)
-        self.formation_pub.publish(msg)
-        self.get_logger().info(f"Published Formation Command: {cmd_dict.get('action')} - {cmd_dict.get('formation', '')}")
+        if not rclpy.ok():
+            return
+        try:
+            msg = String()
+            msg.data = json.dumps(cmd_dict)
+            self.formation_pub.publish(msg)
+            self.get_logger().info(f"Published Formation Command: {cmd_dict.get('action')} - {cmd_dict.get('formation', '')}")
+        except Exception as e:
+            if rclpy.ok():
+                self.get_logger().error(f"Failed to publish formation command: {e}")
 
     def publish_emergency_stop(self, stop_state=True):
-        msg = Bool()
-        msg.data = stop_state
-        self.estop_pub.publish(msg)
-        self.get_logger().warn("Published EMERGENCY STOP command!")
+        if not rclpy.ok():
+            return
+        try:
+            msg = Bool()
+            msg.data = stop_state
+            self.estop_pub.publish(msg)
+            self.get_logger().warn("Published EMERGENCY STOP command!")
+        except Exception as e:
+            if rclpy.ok():
+                self.get_logger().error(f"Failed to publish emergency stop: {e}")
 
     def publish_geofence(self, gf_dict: dict):
         """
@@ -151,6 +163,8 @@ class GroundStationNode(Node):
         Topic: /ground_station/geofence
         Type: geometry_msgs/msg/PolygonStamped
         """
+        if not rclpy.ok():
+            return
         try:
             msg = PolygonStamped()
             msg.header.stamp = self.get_clock().now().to_msg()
@@ -171,7 +185,8 @@ class GroundStationNode(Node):
                 f"Broadcast Geofence '{name}' ({len(pts)} vertices) to /ground_station/geofence"
             )
         except Exception as e:
-            self.get_logger().error(f"Failed to publish geofence: {e}")
+            if rclpy.ok():
+                self.get_logger().error(f"Failed to publish geofence: {e}")
 
     def _normalize_usv_ns(self, usv_id: str) -> str:
         """Normalize 'USV-1', 'usv-1', or '1' to valid ROS 2 topic namespace 'usv_1'."""
@@ -188,6 +203,8 @@ class GroundStationNode(Node):
         return ns.upper()
 
     def _get_or_create_usv_publishers(self, usv_id: str):
+        if not rclpy.ok():
+            return None, None
         ns = self._normalize_usv_ns(usv_id)
         if ns not in self.target_pose_pubs:
             topic_pose = f"/{ns}/target_pose"
@@ -204,8 +221,12 @@ class GroundStationNode(Node):
         Downlink: /usv_{id}/target_pose (geometry_msgs/PoseStamped)
         Publishes assigned target slot coordinates or individual waypoint for a specific USV.
         """
+        if not rclpy.ok():
+            return
         try:
             pose_pub, _ = self._get_or_create_usv_publishers(usv_id)
+            if pose_pub is None:
+                return
             msg = PoseStamped()
             msg.header.stamp = self.get_clock().now().to_msg()
             msg.header.frame_id = 'map'
@@ -218,30 +239,40 @@ class GroundStationNode(Node):
             msg.pose.orientation.w = math.cos(heading_rad / 2.0)
             pose_pub.publish(msg)
         except Exception as e:
-            self.get_logger().error(f"Failed to publish target_pose for {usv_id}: {e}")
+            if rclpy.ok():
+                self.get_logger().error(f"Failed to publish target_pose for {usv_id}: {e}")
 
     def publish_usv_autonomy_mode(self, usv_id: str, mode: str):
         """
         Downlink: /usv_{id}/autonomy_mode (std_msgs/String)
         Publishes autonomy directive: FORMATION, TRANSIT, HOLD, RTH, MANUAL, AVOIDING.
         """
+        if not rclpy.ok():
+            return
         try:
             _, mode_pub = self._get_or_create_usv_publishers(usv_id)
+            if mode_pub is None:
+                return
             msg = String()
             msg.data = mode.upper()
             mode_pub.publish(msg)
         except Exception as e:
-            self.get_logger().error(f"Failed to publish autonomy_mode for {usv_id}: {e}")
+            if rclpy.ok():
+                self.get_logger().error(f"Failed to publish autonomy_mode for {usv_id}: {e}")
 
     def publish_usv_cmd_vel(self, usv_id: str, linear_x: float, angular_z: float):
         """
         Downlink: /usv_{id}/cmd_vel (geometry_msgs/Twist)
         Publishes manual velocity override when operator drives a vehicle via keyboard or joystick.
         """
+        if not rclpy.ok():
+            return
         try:
             ns = self._normalize_usv_ns(usv_id)
             if ns not in self.cmd_vel_pubs:
                 self._get_or_create_usv_publishers(usv_id)
+            if ns not in self.cmd_vel_pubs:
+                return
             msg = Twist()
             msg.linear.x = float(linear_x)
             msg.linear.y = 0.0
@@ -251,7 +282,9 @@ class GroundStationNode(Node):
             msg.angular.z = float(angular_z)
             self.cmd_vel_pubs[ns].publish(msg)
         except Exception as e:
-            self.get_logger().error(f"Failed to publish cmd_vel for {usv_id}: {e}")
+            if rclpy.ok():
+                self.get_logger().error(f"Failed to publish cmd_vel for {usv_id}: {e}")
+
 
     # ── Inbound Telemetry Subscriptions (Uplink Bridge) ──
 
@@ -405,6 +438,8 @@ def main(args=None):
         nonlocal is_shutting_down
         is_shutting_down = True
         ros_spin_timer.stop()
+        if hasattr(window, 'anim_timer') and window.anim_timer.isActive():
+            window.anim_timer.stop()
         app.quit()
 
     signal.signal(signal.SIGINT, sigint_handler)
@@ -437,6 +472,8 @@ def main(args=None):
     # Clean shutdown
     is_shutting_down = True
     ros_spin_timer.stop()
+    if hasattr(window, 'anim_timer') and window.anim_timer.isActive():
+        window.anim_timer.stop()
     if rclpy.ok():
         try:
             ros_node.destroy_node()
