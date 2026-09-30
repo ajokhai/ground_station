@@ -6,3 +6,9 @@ log/
 *.pyc
 __pycache__/
 .pixi/
+
+# Internal Agent & Task Tracking
+AGENTS.md
+agents.md
+TASKS.md
+tasks.md
